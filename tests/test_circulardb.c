@@ -1,6 +1,6 @@
 /*
  * testcirculardb
- * (C) 2006 Powerset, Inc.
+ *
  */
 
 #ifndef LINT

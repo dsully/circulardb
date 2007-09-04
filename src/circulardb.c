@@ -1,6 +1,6 @@
 /*
  * CircularDB implementation for time series data.
- * (C) 2007 Powerset, Inc.
+ *
  */
 
 #ifndef LINT
