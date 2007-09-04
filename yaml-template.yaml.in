@@ -1,0 +1,33 @@
+FILE_FORMAT:
+  format: powerset_package
+  version: 1.0
+PKG_SUMMARY: "@SHORT_DESCRIPTION@"
+PKG_NAME: @PACKAGE_NAME@
+PKG_VERSION: @PACKAGE_VERSION@
+PKG_RELEASE: @PACKAGE_RELEASE@
+PKG_LICENSE: commercial
+PKG_GROUP: Powerset
+PKG_TARGETS: x86_64-linux, i386-linux, i386-darwin, noarch
+PKG_MAINTAINER: @PACKAGE_BUGREPORT@
+PKG_DEPENDS: @RUNTIME_DEPENDS_LIST@
+  
+PKG_DEFAULTS:
+  owner: root
+  group: wheel
+  mode: -
+
+PKG_FILES:
+  finds:
+    - source: .pkgtmp/doc -type f -o -type l
+      destination: doc/gems/
+    - source: .pkgtmp/gems -type f -o -type l
+      destination: lib/gems
+    - source: .pkgtmp/specifications -type f -o -type l
+      destination: conf/gems
+    - source: .pkgtmp/bin -type f -o -type l
+      destination: bin/
+    - source: @PACKAGE_NAME@.pc
+      destination: lib/pkgconfig
+
+PKG_DESCRIPTION: 
+  <%= encode_files('README', 'ChangeLog') %>
