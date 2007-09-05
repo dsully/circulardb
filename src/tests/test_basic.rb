@@ -31,13 +31,13 @@ class TestCircularDB < Test::Unit::TestCase
 
   def test_rw
 
+    records = Array.new
     now     = Time.now.to_i
 
-    records = Array.new(10) do |i|
-      value = [ now, i.to_f ]
+    (1..10).each { |i|
+      records.push([ now, i.to_f ])
       now += 1
-      value
-    end
+    }
 
     cdb = CircularDB::Storage.new(@file, "Testing Ruby CDB")
     assert(cdb)

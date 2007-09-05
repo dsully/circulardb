@@ -10,13 +10,13 @@ dnl - The following prerequisites line can be used to specify
 dnl - the exact, or minimum, versions of packages on which this
 dnl - package will depend (for build _and_ runtime)
 
-RUNTIME_PREREQUISITES="powerset_ruby, powerset_rubygems, circulardb"
+RUNTIME_PREREQUISITES="powerset_ruby, powerset_rubygems, circulardb-0"
 
 dnl - The following prerequisites line can be used to specify
 dnl - the exact, or minimum, versions of packages on which this
 dnl - package will depend (for build only)
 
-BUILD_PREREQUISITES="rubygem_power_hoe, circulardb"
+BUILD_PREREQUISITES="rubygem_power_hoe"
 
 dnl -- [ end basic configuration ]
 

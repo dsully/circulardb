@@ -1,22 +1,39 @@
+AWK = awk
+
+srcdir = .
+top_srcdir = $(srcdir)
+
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = @PACKAGE_NAME@.pc
 
 @PACKAGE_NAME@.pc: pkgconfig-template.pc
 	ln -f pkgconfig-template.pc @PACKAGE_NAME@.pc
 
-package powerpack: $(wildcard *.yaml) @PACKAGE_NAME@.pc
+package powerpack: rpms @PACKAGE_NAME@.pc
+	
+.PHONY: rpms
+rpms: $(wildcard *.yaml) 
 	@if test "@prefix@" != "/p" ; then \
 	  echo "failed: prefix \"@prefix@\" invalid; make powerpack requires a prefix of /p" ; \
 	  exit 1 ; \
 	fi
+	@if @EGREP@ -q "__MAGIC__" $(top_srcdir)/README; then \
+	  echo "failed: README has not been updated. Please put something useful to others in the README" ; \
+	  exit 1 ; \
+	fi
+	@if ! @EGREP@ -q "@PACKAGE_VERSION@" $(top_srcdir)/ChangeLog; then \
+	  echo "failed: ChangeLog has not been updated. Please put something about this version (@PACKAGE_VERSION@) in the ChangeLog" ; \
+	  exit 1 ; \
+  fi
 	@if test -d PowerPack ; then rm -rf PowerPack; fi
 	@if test -d .pkgtmp ; then rm -rf .pkgtmp; fi
 	@$(MAKE) DESTDIR=`pwd`/.pkgtmp install && \
-	(arch_list=(noarch @cv_sys_path@) ; \
-	this_arch=$${arch_list[$$(find .pkgtmp -type f | xargs file | grep -E -cm 1 ":.*[x36]86")]} ; \
-	for yaml_target in $^; do \
-		pp_create.rb $$yaml_target --target=$${this_arch} ; \
-	done)
+	 ( arch_list=(noarch @cv_sys_path@) ; \
+     this_arch=$${arch_list[$$(find .pkgtmp -type f | xargs file -Lb | @EGREP@ -cm 1 '([ ]ar[ ]|[x36]86)')]} ; \
+     @ax_track_arg_fn@ ; \
+     for yaml_target in $^; do \
+       pp_create.rb $$yaml_target --target=$${this_arch} $${ax_track_arg} ; \
+	   done)
 
 package-upload powepack-upload: powerpack
 	@if svn status 2>/dev/null | @EGREP@ -q '^[ACDMR]' ; then \
@@ -57,7 +74,7 @@ install: src/pkg/@GEM_NAME@-@PACKAGE_VERSION@.gem
 check:
 	cd src && rake test; cd ..
 
-clean:
+clean: maintainer-clean-local
 	cd src && rake clean; cd .. 
 
 maintainer-clean-local:
