@@ -30,7 +30,7 @@ module CircularDB
       @instance = instance
 
       if @name =~ /#{EXTENSION}$/
-        @name.gsub!(/#{EXTENSION}/, '')
+        @name.sub!(/#{EXTENSION}/, '')
       end
 
       if @instance !~ /^(\/|\.)/
@@ -42,8 +42,6 @@ module CircularDB
       end
 
       @scratch_dir = Tempfile.new('gnuplot' << Time.now.to_i.to_s).close!.path
-
-      self
     end
 
     def read_records(start_time = 0, end_time = 0, num_req = 0)
@@ -96,13 +94,13 @@ module CircularDB
 
         unless File.exists?(data_file)
 
-          File.open(data_file, File::RDWR|File::CREAT) { |fh|
+          File.open(data_file, File::RDWR|File::CREAT) do |fh|
             read_start, read_end = cdb.print_records(start_time, end_time, nil, fh, nil, for_graphing)
-          }
+          end
 
         end
 
-        File.open(data_file).each { |line|
+        File.open(data_file).each do |line|
 
           time, value = line.split
 
@@ -113,7 +111,7 @@ module CircularDB
           read_data[time] = value
 
           read_end = time
-        }
+        end
 
         parsed[data_file] = read_data
 
@@ -131,12 +129,12 @@ module CircularDB
       interp = Interpolation::Interp.new(Interpolation::LINEAR, driver_x_values.size)
 
       # setup initial xy mapping
-      parsed[driver].sort { |a,b| a[0] <=> b[0] }.each { |data|
+      parsed[driver].sort { |a,b| a[0] <=> b[0] }.each do |data|
         driver_x_values.push(data[0])
         interpolated_values[data[0]] = data[1]
-      }
+      end
 
-      data_files.each { |follower|
+      data_files.each do |follower|
 
         follower_x_values = Array.new
         follower_y_values = Array.new
@@ -146,19 +144,19 @@ module CircularDB
           follower_y_values[data[0]] = data[1]
         }
 
-        driver_x_values.each { |x|
+        driver_x_values.each do |x|
 
           interp.init(follow_xvalues, follow_yvalues)
 
           yi = interp.eval(follow_xvalues, follow_yvalues, x, accel)
 
           interpolated_values[x] += yi
-        }
-      }
+        end
+      end
 
-      interpolated_values.sort { |a,b| a[0] <=> b[0] }.each { |data|
+      interpolated_values.sort { |a,b| a[0] <=> b[0] }.each do |data|
         fh.puts "#{a[0]} #{a[1]}"
-      }
+      end
 
       return real_start[0], real_end[0]
 

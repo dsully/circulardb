@@ -5,8 +5,6 @@ require 'rubygems'
 
 # 3rd party rubygem requires
 
-# powerset rubygem requires
-
 $:.unshift File.dirname(__FILE__) # For use/testing when no gem is installed
 
 # internal requires
@@ -21,5 +19,5 @@ require 'circulardb/aggregate'
 # SPECIFIED IN configure.ac DURING PACKAGING
 
 module CircularDB
-  VERSION = '0.0.0'
+  VERSION = '0.1.0'
 end

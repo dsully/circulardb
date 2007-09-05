@@ -89,7 +89,7 @@ module CircularDB
       axes   = Hash.new
       styles = [3, 1, 2, 9, 10, 8, 7, 13]
 
-      if not File.exists?(@scratch_dir)
+      unless File.exists?(@scratch_dir)
         FileUtils.mkdir_p @scratch_dir
       end
 
@@ -126,7 +126,7 @@ module CircularDB
 
             dirname = File.dirname(@output)
 
-            if not File.exists?(dirname)
+            unless File.exists?(dirname)
               FileUtils.mkdir_p(dirname)
             end
 
@@ -208,7 +208,14 @@ module CircularDB
             axis = axes[data_units]
 
             unless axis
-              axis = axes[data_units] = axes.length >= 1 ? 'x1y2' : 'x1y1'
+
+              if axes.length >= 1
+                axis = 'x1y2'
+              else
+                axis = 'x1y1'
+              end
+
+              axes[data_units] = axis 
             end
 
             if data_units
@@ -230,25 +237,23 @@ module CircularDB
             # will be replaced by the value provided by fix_logscale.
             yaxis = 2
 
-            if @logscale
-              if @fix_logscale
+            if @logscale and @fix_logscale
 
-                # We use the ? operator :
-                # condition ? TRUE : FALSE
-                #
-                # So if the y value is > 0 we use it.
-                # If the y value <= 0, then we replace this value by the one provided
-                #  by fixLogscale
-                yaxis = '(2>0?2:' << @fix_logscale.to_s << ')'
+              # We use the ? operator :
+              # condition ? TRUE : FALSE
+              #
+              # So if the y value is > 0 we use it.
+              # If the y value <= 0, then we replace this value by the one provided
+              #  by fixLogscale
+              yaxis = '(2>0?2:' << @fix_logscale.to_s << ')'
 
-                # If the value provided by fixLogscale is a numeric one
-                # we signal to the user we have replaced all the values below zero by
-                # the value provided by fixLogscale
-                if @fix_logscale =~ /\d+\.?\d*/
+              # If the value provided by fixLogscale is a numeric one
+              # we signal to the user we have replaced all the values below zero by
+              # the value provided by fixLogscale
+              if @fix_logscale =~ /\d+\.?\d*/
 
-                  ylabel  << ' [' << @fix_logscale.to_s << ' means zero] '
-                  y2label << ' [' << @fix_logscale.to_s << ' means zero] '
-                end
+                ylabel  << ' [' << @fix_logscale.to_s << ' means zero] '
+                y2label << ' [' << @fix_logscale.to_s << ' means zero] '
               end
             end
 
@@ -274,7 +279,7 @@ module CircularDB
               x_start = real_start < x_start ? real_start : x_start
             end
 
-            if x_start == 0
+            if x_end == 0
               x_end = real_end
             else 
               x_end = real_end > x_end ? real_end : x_end
