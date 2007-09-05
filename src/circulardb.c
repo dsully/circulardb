@@ -7,6 +7,8 @@
 static const char svnid[] __attribute__ ((unused)) = "$Id$";
 #endif
 
+#include "config.h"
+
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -23,7 +25,7 @@ static const char svnid[] __attribute__ ((unused)) = "$Id$";
 #include <time.h>
 #include <unistd.h>
 
-#include <circulardb.h>
+#include <circulardb_interface.h>
 
 // DRK general: why not mmap the arena and treat it as an array to avoid all
 // the "* RECORD_SIZE"

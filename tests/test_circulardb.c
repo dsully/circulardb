@@ -9,7 +9,7 @@ static const char svnid[] __attribute__ ((unused)) = "$Id$";
 
 #include <assert.h>
 
-#include <circulardb.h>
+#include <circulardb_interface.h>
 
 int
 main (int argc, char **argv)
