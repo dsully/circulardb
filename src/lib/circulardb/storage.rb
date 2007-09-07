@@ -72,7 +72,7 @@ module CircularDB
           nil_values.push(date)
         end
 
-        if data_type == "counter" and value < prev_value
+        if type == "counter" and value < prev_value
           wraps.push(date)
         end
 
