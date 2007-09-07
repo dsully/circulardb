@@ -359,7 +359,7 @@ uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
         }
 
         if (pwrite(cdb->fd, &records[i], RECORD_SIZE, offset) != RECORD_SIZE) {
-            printf("Couldn't write record [%s]\n", strerror(errno));
+            printf("Couldn't write record [%d] [%s] for: [%s]\n", errno, strerror(errno), cdb->filename);
             break;
         }
 
@@ -1024,10 +1024,8 @@ void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_request
 
 void cdb_print(cdb_t *cdb) {
 
-    char *date_format = NULL;
+    char date_format[17] = "%Y-%m-%d %H:%M:%S";
     time_t first_time, last_time;
-
-    strcpy(date_format, "%Y-%m-%d %H:%M:%S");
 
     printf("============== Header ================\n");
     cdb_read_header(cdb);
