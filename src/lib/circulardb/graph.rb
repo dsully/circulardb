@@ -196,13 +196,20 @@ module CircularDB
             end
 
             # Default plot format - rounds to whole numbers and kilo/mega bytes
-            plot.format "y \"%3.0s %cB\""
-            #plot.format "y \"%6.5f\""
+            if data_units =~ /per\s+/
+              plot.format "y \"%6.0s %cB\""
+            else
+              plot.format "y \"%6.0s\""
+            end
 
             # Automatically scale to percentage based
             if data_units == "percent"
               plot.yrange "[0:100]"
               plot.format "y \"%3.0s %%\""
+            end
+
+            if data_units =~ /degrees/
+              plot.format "y \"%3.0s #{176.chr}\""
             end
 
             axis = axes[data_units]
@@ -218,7 +225,7 @@ module CircularDB
               axes[data_units] = axis 
             end
 
-            if data_units
+            if data_units and data_units !~ /degrees|percent/
               if axis =~ /y1/
                 ylabel = data_units
               else

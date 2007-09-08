@@ -11,8 +11,8 @@ module CircularDB
     def name(pretty = 0)
       name = @header[:name]
 
-      if pretty and description and description !~ /Circular DB.*entries/
-        name << description
+      if pretty and description and description !~ /Circular DB.*/
+        name << " " << description
       end
 
       name
