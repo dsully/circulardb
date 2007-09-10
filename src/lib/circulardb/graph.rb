@@ -265,13 +265,16 @@ module CircularDB
             end
 
             if @show_data or @show_trend
+
+              # Fixup dev names.
+              name.gsub!(/_/, '/')
               
               plot.cmd << " \"#{data_file}\" using 1:#{yaxis} "
 
-              if @show_data
+              if @show_data and @show_trend == 0
                 plot.cmd << "axes #{axis} title \"#{name}\" "
-              elsif show_trend
-                plot.cmd << "smooth bezier axes #{axis} title \"#{name}\" trend "
+              elsif @show_trend
+                plot.cmd << "smooth bezier axes #{axis} title \"#{name}\" "
               end
 
               plot.cmd << "with #{@style} lw 1.5 lt #{styles[num_plots]},"

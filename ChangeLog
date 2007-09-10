@@ -1,3 +1,8 @@
+Version 0.1.1 (dan)
+	* Minor logic cleanups. Remove GSL check until kevin installs it.
+  * Add prettier unit display.
+  * Add some small utilities. Fix validation bug.
+
 Version 0.1.0 (dan)
 	* First commit
 

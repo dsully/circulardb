@@ -15,8 +15,8 @@ module CircularDB
       require 'GSL'
       include GSL
     rescue LoadError
-      puts "GSL (http://ruby-gsl.sourceforge.net/) is not installed. Exiting."
-      exit
+      #puts "GSL (http://ruby-gsl.sourceforge.net/) is not installed. Exiting."
+      #exit
     end
 
     EXTENSION = '.acdb'
