@@ -40,7 +40,7 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
 
     cdb_t *cdb;
     VALUE header = rb_hash_new();
-    VALUE filename, name, max_records, type, units, desc;
+    VALUE filename, name, max_records, num_records, type, units, desc;
 
     char *regex = ALLOCA_N(char, 4);
 
@@ -75,6 +75,7 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
             units       = rb_str_new2(cdb->header->units);
             desc        = rb_str_new2(cdb->header->description);
             max_records = ULL2NUM(cdb->header->max_records);
+            num_records = ULL2NUM(cdb->header->num_records);
         }
 
     } else {
@@ -91,11 +92,14 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
             StringValuePtr(units),
             StringValuePtr(desc)
         );
+
+        num_records = INT2FIX(0);
     }
 
     rb_hash_aset(header, ID2SYM(rb_intern("name")), name);
     rb_hash_aset(header, ID2SYM(rb_intern("type")), type);
     rb_hash_aset(header, ID2SYM(rb_intern("units")), units);
+    rb_hash_aset(header, ID2SYM(rb_intern("num_records")), num_records);
     rb_hash_aset(header, ID2SYM(rb_intern("max_records")), max_records);
     rb_hash_aset(header, ID2SYM(rb_intern("description")), desc);
 
