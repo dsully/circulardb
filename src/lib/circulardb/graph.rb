@@ -157,6 +157,10 @@ module CircularDB
 
           @cdbs.each do |cdb|
 
+            if cdb.num_records == 0
+              next
+            end
+
             name = cdb.name
 
             # If the cdb name is used more than once we use it's longer name
@@ -178,7 +182,7 @@ module CircularDB
             real_end   = 0
 
             # Write out the temporary data file for gnuplot to read.
-            data_file = File.join(@scratch_dir, name + ".dat").gsub(/[^\w\d_:\.\/-]/, '_')
+            data_file = File.join(@scratch_dir, name.gsub(/[^\w\d_:\.-]/, '_') + ".dat")
 
             # Gnuplot can read data from a file much faster than us building up objects
             # for a dataset. Uses much less memory as well.
