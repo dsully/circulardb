@@ -906,6 +906,11 @@ void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_request
 
     num_recs = cdb_read_records(cdb, start, end, num_requested, &records);
 
+    if (num_recs == 0) {
+        free(records);
+        return;
+    }
+
     /* this for event type graphs, we summarize
        the count number of entries in the db per some time unit,
        ignoring the value of the records
