@@ -12,21 +12,27 @@ class TestCircularDB < Test::Unit::TestCase
     @file    = File.join(@tempdir, 'basic.cdb')
     @name    = "Testing Ruby CDB"
 
-    FileUtils.rm_rf @tempdir
+    if File.exists?(@tempdir)
+      FileUtils.rm_rf @tempdir
+    end
+
     FileUtils.mkdir_p @tempdir
   end
 
   def teardown
-    FileUtils.rm_rf @tempdir
+    if File.exists?(@tempdir)
+      FileUtils.rm_rf @tempdir
+    end
   end
 
   def test_create
-    cdb = CircularDB::Storage.new(@file, @name)
+    cdb = CircularDB::Storage.new(@file, File::CREAT|File::RDWR|File::EXCL, nil, @name)
     assert(cdb)
     assert_equal(cdb.filename, @file)
     assert_equal(cdb.name, @name)
     assert_equal(cdb.type, "gauge")
     assert_equal(cdb.units, "absolute")
+    cdb.close
   end
 
   def test_rw
@@ -39,7 +45,7 @@ class TestCircularDB < Test::Unit::TestCase
       now += 1
     }
 
-    cdb = CircularDB::Storage.new(@file, "Testing Ruby CDB")
+    cdb = CircularDB::Storage.new(@file, File::CREAT|File::RDWR|File::EXCL, nil, @name)
     assert(cdb)
 
     assert_equal(10, cdb.write_records(records))
@@ -75,6 +81,7 @@ class TestCircularDB < Test::Unit::TestCase
 
     assert_equal(nil_check[6][1], nil)
 
+    cdb.close
   end
 
 end

@@ -56,6 +56,10 @@ module CircularDB
       prev_date  = -1;
       prev_value = -1;
 
+      if self.num_records == 0
+        puts "No records!"
+      end
+
       records = self.read_records
 
       records.each { |entry|

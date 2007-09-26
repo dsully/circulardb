@@ -40,11 +40,11 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
 
     cdb_t *cdb;
     VALUE header = rb_hash_new();
-    VALUE filename, name, max_records, num_records, type, units, desc;
+    VALUE filename, flags, mode, name, max_records, num_records, type, units, desc;
 
     char *regex = ALLOCA_N(char, 4);
 
-    rb_scan_args(argc, argv, "15", &filename, &name, &max_records, &type, &units, &desc);
+    rb_scan_args(argc, argv, "17", &filename, &flags, &mode, &name, &max_records, &type, &units, &desc);
 
     Data_Get_Struct(self, cdb_t, cdb);
 
@@ -65,25 +65,43 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
 
     rb_hash_aset(header, ID2SYM(rb_intern("filename")), filename);
 
+    if (NIL_P(flags)) {
+        cdb->flags = -1;
+    } else {
+        cdb->flags = NUM2INT(flags);
+    }
+
+    if (NIL_P(mode)) {
+        cdb->mode = -1;
+    } else {
+        cdb->mode = NUM2INT(mode);
+    }
+
+    /* Try the open */
+    if (cdb_open(cdb) > 0) {
+        rb_raise(rb_eIOError, strerror(errno));
+    }
+
     /* Try and read a header, if it doesn't exist, create one */
     if (NIL_P(name)) {
 
-        if (cdb_read_header(cdb) == 0) {
-
-            name        = rb_str_new2(cdb->header->name);
-            type        = rb_str_new2(cdb->header->type);
-            units       = rb_str_new2(cdb->header->units);
-            desc        = rb_str_new2(cdb->header->description);
-            max_records = ULL2NUM(cdb->header->max_records);
-            num_records = ULL2NUM(cdb->header->num_records);
+        if (cdb_read_header(cdb) > 0) {
+            rb_raise(rb_eIOError, strerror(errno));
         }
+
+        name        = rb_str_new2(cdb->header->name);
+        type        = rb_str_new2(cdb->header->type);
+        units       = rb_str_new2(cdb->header->units);
+        desc        = rb_str_new2(cdb->header->description);
+        max_records = ULL2NUM(cdb->header->max_records);
+        num_records = ULL2NUM(cdb->header->num_records);
 
     } else {
 
         if (NIL_P(max_records)) max_records = INT2FIX(0);
         if (NIL_P(type))  type  = rb_str_new2(CDB_DEFAULT_DATA_TYPE);
         if (NIL_P(units)) units = rb_str_new2(CDB_DEFAULT_DATA_UNIT);
-        if (NIL_P(desc))  desc  = rb_str_new2("Circular DB");
+        if (NIL_P(desc))  desc  = rb_str_new2("");
 
         cdb_generate_header(cdb,
             StringValuePtr(name),
@@ -94,6 +112,10 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
         );
 
         num_records = INT2FIX(0);
+
+        if (cdb_write_header(cdb) > 0) {
+            rb_raise(rb_eIOError, strerror(errno));
+        }
     }
 
     rb_hash_aset(header, ID2SYM(rb_intern("name")), name);
@@ -106,7 +128,7 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
     rb_iv_set(self, "@header", header);
 
     return self;
-} 
+}
 
 static VALUE _set_header(VALUE self, VALUE name, VALUE value) {
 
@@ -150,6 +172,11 @@ static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
     Data_Get_Struct(self, cdb_t, cdb);
 
     cnt = cdb_read_records(cdb, NUM2UINT(start), NUM2UINT(end), rb_num2ull(num_req), &records);
+
+    switch (cnt) {
+        case -1: rb_raise(rb_eStandardError, "End time must be >= Start time.");
+        case -2: rb_raise(rb_eStandardError, "Database is unsynced.");
+    }
 
     array = rb_ary_new2(cnt);
 
@@ -199,6 +226,10 @@ static VALUE _cdb_write_or_update_records(VALUE self, VALUE array, int type) {
         cnt = cdb_update_records(cdb, records, len);
     }
 
+    if (cnt == 0) {
+        rb_raise(rb_eIOError, strerror(errno));
+    }
+
     _cdb_rb_update_header_hash(self, cdb);
 
     return ULL2NUM(cnt);
@@ -221,6 +252,10 @@ static VALUE _cdb_write_or_update_record(VALUE self, VALUE time, VALUE value, in
         cnt = cdb_write_record(cdb, NUM2ULONG(time), NUM2DBL(value));
     } else {
         cnt = cdb_update_record(cdb, NUM2ULONG(time), NUM2DBL(value));
+    }
+
+    if (cnt == 0) {
+        rb_raise(rb_eIOError, strerror(errno));
     }
 
     _cdb_rb_update_header_hash(self, cdb);
@@ -256,12 +291,38 @@ static VALUE cdb_rb_discard_records_in_time_range(VALUE self, VALUE start_time, 
     return ULL2NUM(cdb_discard_records_in_time_range(cdb, NUM2ULONG(start_time), NUM2ULONG(end_time)));
 }
 
+static VALUE cdb_rb_open_cdb(VALUE self) {
+
+    cdb_t *cdb;
+    Data_Get_Struct(self, cdb_t, cdb);
+
+    if (cdb_open(cdb) > 0) {
+        rb_raise(rb_eIOError, strerror(errno));
+    }
+
+    return self;
+}
+
+static VALUE cdb_rb_close_cdb(VALUE self) {
+
+    cdb_t *cdb;
+    Data_Get_Struct(self, cdb_t, cdb);
+
+    if (cdb_close(cdb) > 0) {
+        rb_raise(rb_eIOError, strerror(errno));
+    }
+
+    return self;
+}
+
 static VALUE cdb_rb_read_header(VALUE self) {
 
     cdb_t *cdb;
     Data_Get_Struct(self, cdb_t, cdb);
 
-    cdb_read_header(cdb);
+    if (cdb_read_header(cdb) > 0) {
+        rb_raise(rb_eIOError, strerror(errno));
+    }
 
     _cdb_rb_update_header_hash(self, cdb);
 
@@ -273,7 +334,9 @@ static VALUE cdb_rb_write_header(VALUE self) {
     cdb_t *cdb;
     Data_Get_Struct(self, cdb_t, cdb);
 
-    cdb_write_header(cdb);
+    if (cdb_write_header(cdb) > 0) {
+        rb_raise(rb_eIOError, strerror(errno));
+    }
 
     return self;
 }
@@ -370,6 +433,8 @@ void Init_circulardb_ext() {
     rb_define_alloc_func(cStorage, cdb_rb_alloc);
 
     rb_define_method(cStorage, "initialize", cdb_rb_initialize, -1); 
+    rb_define_method(cStorage, "open", cdb_rb_open_cdb, 0); 
+    rb_define_method(cStorage, "close", cdb_rb_close_cdb, 0); 
     rb_define_method(cStorage, "read_header", cdb_rb_read_header, 0); 
     rb_define_method(cStorage, "read_records", cdb_rb_read_records, -1); 
     rb_define_method(cStorage, "write_header", cdb_rb_write_header, 0); 

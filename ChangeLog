@@ -1,7 +1,12 @@
+Version 0.1.2 (dan)
+	* Pass in flags & mode for file open.
+	* Raise exceptions to the Ruby layer.
+	* Graphing updates. Silence a bunch of warnings.
+
 Version 0.1.1 (dan)
 	* Minor logic cleanups. Remove GSL check until kevin installs it.
-  * Add prettier unit display.
-  * Add some small utilities. Fix validation bug.
+	* Add prettier unit display.
+	* Add some small utilities. Fix validation bug.
 
 Version 0.1.0 (dan)
 	* First commit

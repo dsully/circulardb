@@ -24,7 +24,7 @@ module CircularDB
     #
     # GNUPlot 4.2 adds: filledcurves & histograms. Common usage would be:
     # 'filledcurves above x1'
-    attr_accessor :style, :title, :fix_logscale, :type, :show_data, :show_trend, :logscale, :inversed, :debug
+    attr_accessor :style, :title, :fix_logscale, :type, :show_data, :show_trend, :logscale, :debug
     attr_reader :size
 
     def initialize(output, start_time = 0, end_time = 0, cdbs = [])
@@ -110,16 +110,11 @@ module CircularDB
           else
 
             case size
-              when "large"  then plot.size "1.75,1.45"
-              when "medium" then plot.size "1.25,0.95"
-              else               plot.size "0.75,0.45"
+              when "large"  then plot.terminal "png transparent small size 1060,800"
+              when "medium" then plot.terminal "png transparent small size 840,600"
+              else               plot.terminal "png transparent small size 450,250"
             end
 
-            if @inversed
-              plot.terminal "png small color x000000 xffffff x444444"
-            else
-              plot.terminal "png small"
-            end
           end
 
           if @output and @output !~ /^\s*$/
@@ -155,13 +150,17 @@ module CircularDB
             cdb_list[cdb.name] = 1
           end
 
+          plots = @cdbs.size
+
           @cdbs.each do |cdb|
 
             if cdb.num_records == 0
+              puts "No records to plot for: #{cdb.filename}"
+              plots -= 1
               next
             end
 
-            name = cdb.name
+            name = cdb.name.clone
 
             # If the cdb name is used more than once we use it's longer name
             if cdb_list[name] > 1
@@ -171,8 +170,9 @@ module CircularDB
 
             name.gsub!(/Circular DB/, '')
 
-            data_units = cdb.units
-            data_type  = cdb.type
+            if cdb.type == "counter"
+              name << " (#{cdb.units})"
+            end
 
             if name.length > @legend_max
               name = name[0, ((@legend_max.length - 5 / 2))] << '[...]'
@@ -181,8 +181,17 @@ module CircularDB
             real_start = 0
             real_end   = 0
 
+            # Check for empty and bogus values.
+            sum = cdb.aggregate_using_function_for_records("sum", @start_time, @end_time)
+
+            if sum.nan?
+              puts "Sum is NaN for: #{cdb.filename}"
+              plots -= 1
+              next
+            end
+
             # Write out the temporary data file for gnuplot to read.
-            data_file = File.join(@scratch_dir, name.gsub(/[^\w\d_:\.-]/, '_') + ".dat")
+            data_file = File.join(@scratch_dir, File.basename(cdb.filename) + ".dat")
 
             # Gnuplot can read data from a file much faster than us building up objects
             # for a dataset. Uses much less memory as well.
@@ -190,33 +199,23 @@ module CircularDB
               real_start, real_end = cdb.print_records(@start_time, @end_time, nil, fh, nil, for_graphing)
             }
 
-            if data_type == "counter"
-              # Work around for counter-based cpu usage, which is really a percentage once it's cooked. 
-              if name =~ /percent/i
-                data_units = "percent"
-              end
-
-              name << "(#{data_units})"
+            if File.stat(data_file).zero?
+              puts "Data file is empty for: #{cdb.filename}"
+              plots -= 1
+              next
             end
 
-            # Default plot format - rounds to whole numbers and kilo/mega bytes
-            if data_units =~ /per\s+/
-              plot.format "y \"%6.0s %cB\""
-            else
-              plot.format "y \"%6.0s\""
+            # Silence gnuplot warnings.
+            if name =~ /temperature/i
+              min = cdb.aggregate_using_function_for_records("min", @start_time, @end_time)
+              max = cdb.aggregate_using_function_for_records("max", @start_time, @end_time)
+
+              plot.yrange "[-#{min-1.0}:#{max+1.0}]" if min == max
+            else 
+              plot.yrange '[-1:1]' if sum == 0.0
             end
 
-            # Automatically scale to percentage based
-            if data_units == "percent"
-              plot.yrange "[0:100]"
-              plot.format "y \"%3.0s %%\""
-            end
-
-            if data_units =~ /degrees/
-              plot.format "y \"%3.0s #{176.chr}\""
-            end
-
-            axis = axes[data_units]
+            axis = axes[cdb.units]
 
             unless axis
 
@@ -226,20 +225,8 @@ module CircularDB
                 axis = 'x1y1'
               end
 
-              axes[data_units] = axis 
+              axes[cdb.units] = axis 
             end
-
-            if data_units and data_units !~ /degrees|percent/
-              if axis =~ /y1/
-                ylabel = data_units
-              else
-                y2label = data_units
-              end
-            end
-
-            # uncomment these lines to disable bucketing
-            #axis = "x1y1"
-            #y2label = nil
 
             # Data can be processed on the fly by gnuplot. in the "using 1:2"
             # statement, "2" represents the y value to be read (2 means here
@@ -300,16 +287,47 @@ module CircularDB
             end
           end
 
+          if plots == 0
+            puts "Nothing to plot!"
+            return
+          end
+
           # Zap the trailing comma.
           plot.cmd.chop!
 
-          plot.xrange "[\"#{x_start}\":\"#{x_end}\"]"
-          plot.ylabel "\"#{ylabel}\"" if ylabel
+          axes.each_pair do |units,axis|
 
-          if y2label
-            plot.y2label "\"#{y2label}\""
-            plot.y2tics
+            # Default plot format - rounds to whole numbers and kilo/mega bytes
+            if units =~ /bytes per/
+              format = "\"%6.0s %cB\""
+            else
+              format = "\"%6.0s %c\""
+            end
+
+            # Automatically scale to percentage based
+            if units == "percent"
+              plot.yrange "[0:100]"
+              format = "\"%3.0s %%\""
+            end
+
+            if units =~ /degrees/
+              format = "\"%3.1s #{176.chr}\""
+            end
+
+            if axis =~ /y1/
+              plot.format "y #{format}"
+              plot.ylabel "\"#{units}\""
+              plot.yrange "[0:100]" if units =~ /percent/
+              ylabel = units
+            else
+              plot.format "y2 #{format}"
+              plot.y2label "\"#{units}\""
+              plot.y2range "[0:100]" if units =~ /percent/
+              plot.y2tics
+            end
           end
+
+          plot.xrange "[\"#{x_start}\":\"#{x_end}\"]"
 
           # for plots longer than a quarter, skip day and hour information
           if (x_end - x_start <= 30 * ONE_HOUR)
