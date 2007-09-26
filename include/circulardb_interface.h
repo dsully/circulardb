@@ -16,6 +16,7 @@ extern "C" {
 
 #include <float.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -26,6 +27,8 @@ extern "C" {
 #define CDB_DEFAULT_DATA_TYPE "gauge"
 #define CDB_DEFAULT_DATA_UNIT "absolute"
 #define CDB_DEFAULT_RECORDS 180000
+
+#define WRAP_AROUND ULONG_MAX
 
 typedef struct cdb_header_s {
     char name[80];
@@ -46,6 +49,8 @@ typedef struct cdb_record_s {
 
 typedef struct cdb_s {
     int fd;
+    int flags;
+    int mode;
     short synced;
     char *filename;
     cdb_header_t *header;
@@ -56,6 +61,8 @@ typedef struct cdb_s {
 
 cdb_t* cdb_new(void);
 void cdb_free(cdb_t *cdb);
+int cdb_open(cdb_t *cdb);
+int cdb_close(cdb_t *cdb);
 
 void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, char* type, char* units, char* description);
 

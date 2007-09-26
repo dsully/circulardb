@@ -9,6 +9,7 @@ static const char svnid[] __attribute__ ((unused)) = "$Id$";
 
 #include "config.h"
 
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -231,49 +232,15 @@ static int64_t _logical_record_for_time(cdb_t *cdb, time_t req_time, int64_t sta
     return _logical_record_for_time(cdb, req_time, start_logical_record, end_logical_record);
 }
 
-static int _open_cdb(cdb_t *cdb) {
-
-    if (cdb->fd < 0) {
-
-        // DRK O_CREAT needs mode, use O_EXCL
-        cdb->fd = open(cdb->filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-
-        if (cdb->fd < 0) {
-            return errno;
-        }
-    }
-
-    return 0;
-}
-
-static void _close_cdb(cdb_t *cdb) {
-
-    if (cdb->fd > 0) {
-        struct stat st;
-
-        /* Since we opened the file with create flag delete it if nothing was written to it. */
-        if (fstat(cdb->fd, &st) == 0) {
-
-            if (st.st_size <= 0) {
-                unlink(cdb->filename);
-            }
-        }
-
-        close(cdb->fd);
-    }
-
-    cdb->fd = -1;
-}
-
 int cdb_read_header(cdb_t *cdb) {
 
     /* if the header has already been read from backing store do not read again */
     if (cdb->header != NULL && cdb->synced == 1) {
-        return 1;
+        return 0;
     }
 
-    if (_open_cdb(cdb) != 0) {
-        return 1;
+    if (cdb_open(cdb) > 0) {
+        return errno;
     }
 
     if (pread(cdb->fd, cdb->header, HEADER_SIZE, 0) != HEADER_SIZE) {
@@ -290,7 +257,7 @@ int cdb_write_header(cdb_t *cdb) {
     time_t now;
 
     if (cdb->header != NULL && cdb->synced == 1) {
-        return 1;
+        return 0;
     }
 
     time(&now);
@@ -298,8 +265,8 @@ int cdb_write_header(cdb_t *cdb) {
     cdb->header->last_updated = now;
     cdb->synced = 0;
 
-    if (_open_cdb(cdb) != 0) {
-        return 1;
+    if (cdb_open(cdb) > 0) {
+        return errno;
     }
 
     if (pwrite(cdb->fd, cdb->header, HEADER_SIZE, 0) != HEADER_SIZE) {
@@ -332,7 +299,10 @@ uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
     uint64_t num_recs = 0;
     uint64_t i = 0;
 
-    cdb_read_header(cdb);
+    /* XXX - Kinda hacky.. since no exceptions. Below with write_header as well */
+    if (cdb_read_header(cdb) > 0) {
+        return 0;
+    }
 
     for (i = 0; i < len; i++) {
 
@@ -345,8 +315,9 @@ uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
             continue;
         }
 
+        assert(cdb->header->max_records);
+
         if (cdb->header->num_records >= cdb->header->max_records) {
-            // DRK isn't num_records > max_records an assertion failure?
 
             offset = HEADER_SIZE + (cdb->header->start_record * RECORD_SIZE);
             cdb->header->start_record += 1;
@@ -371,7 +342,9 @@ uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
         cdb->synced = 0;
     }
 
-    cdb_write_header(cdb);
+    if (cdb_write_header(cdb) > 0) {
+        return 0;
+    }
 
     return num_recs;
 }
@@ -391,7 +364,9 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
     uint64_t num_recs = 0;
     uint64_t i = 0;
 
-    cdb_read_header(cdb);
+    if (cdb_read_header(cdb) > 0) {
+        return 0;
+    }
 
     num_recs = cdb->header->num_records;
 
@@ -468,7 +443,9 @@ uint64_t cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end)
     int64_t lrec;
     off_t offset = RECORD_SIZE;
 
-    cdb_read_header(cdb);
+    if (cdb_read_header(cdb) > 0) {
+        return 0;
+    }
 
     lrec = _logical_record_for_time(cdb, start, 0, 0);
 
@@ -509,21 +486,23 @@ uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requ
 
     cdb_record_t *buffer = NULL;
 
-    if (start != 0 && end != 0 && end < start) {
-        printf("End [%ld] has to be >= start [%ld] in time interval requested\n", end, start);
+    if (cdb_read_header(cdb) > 0) {
         return 0;
     }
 
-    cdb_read_header(cdb);
+    if (start != 0 && end != 0 && end < start) {
+        // printf("End [%ld] has to be >= start [%ld] in time interval requested\n", end, start);
+        return -1;
+    }
 
     if (cdb->header == NULL || cdb->synced != 1) {
-        printf("read_records: Nothing to read in [%s]\n", cdb->filename);
-        return 0;
+        // printf("read_records: Nothing to read in [%s]\n", cdb->filename);
+        return -2;
     }
 
     /* bail out if there are no records */
     if (cdb->header->num_records <= 0) {
-        printf("read_records: No records!\n");
+        // printf("read_records: No records!\n");
         return 0;
     }
 
@@ -649,7 +628,9 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
     long factor = 0;
     int  multiplier = 1;
 
-    cdb_read_header(cdb);
+    if (cdb_read_header(cdb) > 0) {
+        return 0;
+    }
 
     if (strcmp(cdb->header->type, "counter") == 0) {
 
@@ -673,8 +654,8 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
         regex_t *pat2 = malloc(sizeof(regex_t));
         regmatch_t match[3];
 
-        regcomp(pat1, "^per ([0-9]+) ([a-zA-Z]+)", (REG_EXTENDED|REG_ICASE));
-        regcomp(pat2, "^per ([a-zA-Z]+)", (REG_EXTENDED|REG_ICASE));
+        regcomp(pat1, "per ([0-9]+)[:space:]*([a-zA-Z]+)", (REG_EXTENDED|REG_ICASE));
+        regcomp(pat2, "per ([a-zA-Z]+)", (REG_EXTENDED|REG_ICASE));
 
         // #DRK not sure what the config of this is supposed to look like, but
         // sscanf might be a lot easier here. (sscanf(units, "per %d %s",
@@ -983,7 +964,12 @@ void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_request
 
                     if (prev_value != DBL_MAX && new_value != DBL_MAX) {
 
-                        val_delta = new_value - prev_value;
+                        /* Handle counter wrap arounds */
+                        if (new_value >= prev_value) {
+                            val_delta = new_value - prev_value;
+                        } else {
+                            val_delta = (WRAP_AROUND -prev_value) + new_value;
+                        }
 
                         if (val_delta >= 0) {
                             value = val_delta;
@@ -995,6 +981,8 @@ void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_request
 
                 if (factor != 0) {
 
+                    /* Skip the first entry, since it's absolute and is needed
+                     * to calculate the second */
                     if (!prev_date) {
                         prev_date = date;
                         continue;
@@ -1051,28 +1039,28 @@ void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, char* typ
         max_records = CDB_DEFAULT_RECORDS;
     }
 
-    if (type == NULL || strcmp(type, "") == 0) {
+    if (type == NULL || (strcmp(type, "") == 0)) {
         type = (char*)CDB_DEFAULT_DATA_TYPE;
     }
 
-    if (units == NULL || strcmp(units, "") == 0) {
+    if (units == NULL || (strcmp(units, "") == 0)) {
         units = (char*)CDB_DEFAULT_DATA_UNIT;
     }
 
-    if (description == NULL || strcmp(description, "") == 0) {
-        sprintf(description, " Circular DB %s/%s with %"PRIu64" entries", name, type, max_records);
+    if (description == NULL || (strcmp(description, "") == 0)) {
+        sprintf(cdb->header->description, "Circular DB %s/%s with %"PRIu64" entries", name, type, max_records);
+    } else {
+        strncpy(cdb->header->description, description, strlen(description));
     }
 
-    strncpy(cdb->header->name, name, sizeof(cdb->header->name));
-    strncpy(cdb->header->units, units, sizeof(cdb->header->units));
-    strncpy(cdb->header->type, type, sizeof(cdb->header->type));
-    strncpy(cdb->header->description, description, sizeof(cdb->header->description));
+    strncpy(cdb->header->name, name, strlen(name));
+    strncpy(cdb->header->units, units, strlen(units));
+    strncpy(cdb->header->type, type, strlen(type));
     strncpy(cdb->header->version, CDB_VERSION, strlen(CDB_VERSION));
 
     cdb->header->max_records = max_records;
     cdb->header->num_records = 0;
     cdb->header->start_record = 0;
-    cdb->synced = 0;
 }
 
 cdb_t* cdb_new(void) {
@@ -1081,17 +1069,63 @@ cdb_t* cdb_new(void) {
 
     cdb->header = malloc(HEADER_SIZE);
     cdb->fd = -1;
+    cdb->synced = 0;
+    cdb->flags = -1;
+    cdb->mode = -1;
 
     return cdb;
 }
 
-void cdb_free(cdb_t *cdb) {
+int cdb_open(cdb_t *cdb) {
 
-    cdb_write_header(cdb);
+    if (cdb->fd < 0) {
 
-    _close_cdb(cdb);
+        /* Default flags if none were set */
+        if (cdb->flags == -1) {
+            cdb->flags = O_RDONLY;
+        }
+
+        if (cdb->mode == -1) {
+            cdb->mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+        }
+
+        cdb->fd = open(cdb->filename, cdb->flags, cdb->mode);
+
+        if (cdb->fd < 0) {
+            return errno;
+        }
+    }
+
+    return 0;
+}
+
+int cdb_close(cdb_t *cdb) {
 
     if (cdb != NULL) {
+
+        if (cdb_write_header(cdb) > 0) {
+            return errno;
+        }
+
+        if (cdb->fd > 0) {
+
+            if (close(cdb->fd) == 0) {
+                cdb->fd = -1;
+                return 0;
+            }
+
+            return errno;
+        }
+    }
+
+    return 0;
+}
+
+void cdb_free(cdb_t *cdb) {
+
+    if (cdb != NULL) {
+
+        cdb_close(cdb);
 
         if (cdb->header != NULL) {
             free(cdb->header);
