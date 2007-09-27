@@ -273,6 +273,10 @@ int cdb_write_header(cdb_t *cdb) {
         return errno;
     }
 
+    if (fdatasync(cdb->fd) != 0) {
+        return errno;
+    }
+
     cdb->synced = 1;
 
     return 0;
@@ -317,6 +321,8 @@ uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
 
         assert(cdb->header->max_records);
 
+        /* Do the circular wrap-around. start_record needs to start
+         * incrementing with num_records */
         if (cdb->header->num_records >= cdb->header->max_records) {
 
             offset = HEADER_SIZE + (cdb->header->start_record * RECORD_SIZE);
@@ -1035,6 +1041,12 @@ void cdb_print(cdb_t *cdb) {
 
 void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, char* type, char* units, char* description) {
 
+    memset(cdb->header->name, 0, sizeof(cdb->header->name));
+    memset(cdb->header->type, 0, sizeof(cdb->header->type));
+    memset(cdb->header->units, 0, sizeof(cdb->header->units));
+    memset(cdb->header->version, 0, sizeof(cdb->header->version));
+    memset(cdb->header->description, 0, sizeof(cdb->header->description));
+
     if (max_records == 0) {
         max_records = CDB_DEFAULT_RECORDS;
     }
@@ -1048,7 +1060,7 @@ void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, char* typ
     }
 
     if (description == NULL || (strcmp(description, "") == 0)) {
-        sprintf(cdb->header->description, "Circular DB %s/%s with %"PRIu64" entries", name, type, max_records);
+        sprintf(cdb->header->description, "Circular DB %s : %s with %"PRIu64" entries", name, type, max_records);
     } else {
         strncpy(cdb->header->description, description, strlen(description));
     }
@@ -1066,8 +1078,11 @@ void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, char* typ
 cdb_t* cdb_new(void) {
 
     cdb_t *cdb = malloc(sizeof(cdb_t));
+    memset(cdb, 0, sizeof(cdb_t));
 
     cdb->header = malloc(HEADER_SIZE);
+    memset(cdb->header, 0, HEADER_SIZE);
+
     cdb->fd = -1;
     cdb->synced = 0;
     cdb->flags = -1;
