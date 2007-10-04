@@ -25,23 +25,17 @@ module CircularDB
     # GNUPlot 4.2 adds: filledcurves & histograms. Common usage would be:
     # 'filledcurves above x1'
     attr_accessor :style, :title, :fix_logscale, :type, :show_data, :show_trend, :logscale, :debug
-    attr_reader :size
+    attr_accessor :start_time, :end_time
+    attr_reader :output, :size, :cdbs
 
-    def initialize(output, start_time = 0, end_time = 0, cdbs = [])
+    def initialize(output = nil, start_time = nil, end_time = nil, cdbs = [])
 
-      if (start_time and end_time and start_time >= end_time)
-        raise "Start time #{start_time} should be less than end time #{end_time}\n"
-      end
-
-      @output     = output
-      @start_time = start_time
-      @end_time   = end_time
-      @cdbs       = cdbs
       @legend_max = SMALL_LEGEND_MAX_SIZE
 
-      if File.extname(output) == ".svg"
-        self.type = "svg"
-      end
+      self.output       = output
+      self.start_time   = start_time
+      self.end_time     = end_time
+      self.cdbs         = cdbs
 
       self.style        = "lines"
       self.show_data    = 1
@@ -51,21 +45,54 @@ module CircularDB
       # For whatever reason, "tmpdir" doesn't exist as a standard Ruby library. This
       # seems like a reasonable substitute.
       @scratch_dir = Tempfile.new('gnuplot' << Time.now.to_i.to_s).close!.path
-
-      self
     end
 
     def size=(size)
 
-      @size = size
-
-      if @size == "small"
+      if size == "small"
         @legend_max = SMALL_LEGEND_MAX_SIZE
       else 
         @legend_max = LEGEND_MAX_SIZE
       end
 
-      @size
+      @size = size
+    end
+
+    def cdbs=(cdbs)
+
+      @cdbs = Hash.new
+
+      cdbs.each do |cdb|
+
+        name = cdb.name.clone
+
+        # Use a longer name to eliminate duplicates.
+        if @cdbs.has_key?(name)
+          name = "#{cdb.filename.split(/\//)[-2]} #{name} #{cdb.description}"
+        end
+
+        name.gsub!(/Circular DB/, '')
+
+        if cdb.type == "counter"
+          name << " (#{cdb.units})"
+        end
+
+        if name.length > @legend_max
+          name = name[0, ((@legend_max.length - 5 / 2))] << '[...]'
+        end
+
+        @cdbs[name] = cdb
+
+      end
+    end
+
+    def output=(output)
+
+      if output and File.extname(output) == ".svg"
+        self.type = "svg"
+      end
+
+      @output = output
     end
 
     # Generate the graph. It is possible to plot up to 8 different cdbs on the same
@@ -88,6 +115,10 @@ module CircularDB
 
       axes   = Hash.new
       styles = [3, 1, 2, 9, 10, 8, 7, 13]
+
+      if (@start_time and @end_time and @start_time >= @end_time)
+        raise "Start time #{@start_time} should be less than end time #{@end_time}\n"
+      end
 
       unless File.exists?(@scratch_dir)
         FileUtils.mkdir_p @scratch_dir
@@ -141,45 +172,19 @@ module CircularDB
           plot.xdata "time"
           plot.timefmt '"%s"'
 
-          # We use a hashtable to count how many time is used a cdb's name.  So if a
-          # cdb's name is used twice or more, we will use the cdb's longer name instead
-          cdb_list = Hash.new
-          cdb_list.default = 0
-
-          @cdbs.each do |cdb|
-            cdb_list[cdb.name] = 1
-          end
-
           plots = @cdbs.size
 
-          @cdbs.each do |cdb|
+          @cdbs.keys.sort.each do |name|
+
+            cdb        = @cdbs[name]
+            real_start = 0
+            real_end   = 0
 
             if cdb.num_records == 0
               puts "No records to plot for: #{cdb.filename}"
               plots -= 1
               next
             end
-
-            name = cdb.name.clone
-
-            # If the cdb name is used more than once we use it's longer name
-            if cdb_list[name] > 1
-              # TODO - need to implement longer_name
-              name = cdb.longer_name
-            end
-
-            name.gsub!(/Circular DB/, '')
-
-            if cdb.type == "counter"
-              name << " (#{cdb.units})"
-            end
-
-            if name.length > @legend_max
-              name = name[0, ((@legend_max.length - 5 / 2))] << '[...]'
-            end
-
-            real_start = 0
-            real_end   = 0
 
             # Check for empty and bogus values.
             sum = cdb.aggregate_using_function_for_records("sum", @start_time, @end_time)
@@ -352,15 +357,20 @@ module CircularDB
 
         end
       end
+    end
 
+    def close
       if File.exists?(@scratch_dir)
         FileUtils.rm_rf @scratch_dir
       end
 
+      @cdbs = []
     end
 
   end
 end
+
+
 
 # Override to_gplot to send the script to gnuplot without caring about data.
 begin

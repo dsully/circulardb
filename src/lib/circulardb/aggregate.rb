@@ -11,12 +11,11 @@ module CircularDB
     require 'tempfile'
 
     begin
-      # http://ruby-gsl.sourceforge.net/
       require 'GSL'
       include GSL
-    rescue LoadError
-      #puts "GSL (http://ruby-gsl.sourceforge.net/) is not installed. Exiting."
-      #exit
+    rescue LoadError => e
+      puts "GSL (http://ruby-gsl.sourceforge.net/) is not installed. Exiting (#{e})"
+      exit
     end
 
     EXTENSION = '.acdb'
@@ -24,10 +23,10 @@ module CircularDB
 
     attr_accessor :cdbs
 
-    def initialize(instance)
+    def initialize(name)
 
-      @name     = instance
-      @instance = instance
+      @name     = name
+      @instance = name
 
       if @name =~ /#{EXTENSION}$/
         @name.sub!(/#{EXTENSION}/, '')
@@ -55,10 +54,10 @@ module CircularDB
         FileUtils.mkdir_p @scratch_dir
       end
 
-      data_files  = Array.new
-      real_start  = Array.new
-      real_end    = Array.new
-      parsed_data = Hash.new
+      data_files = Array.new
+      real_start = Array.new
+      real_end   = Array.new
+      parsed     = Hash.new
 
       # We use a hashtable to count how many time is used a cdb's name.
       # So if a cdb's name is used twice or more, we will use the cdb's 
@@ -81,14 +80,14 @@ module CircularDB
           name = cdb.longer_name
         end
 
-        if name !~ /^#{PREFIX}/
-            name = prefix << name
+        if name !~ /^PREFIX/
+            name = "#{PREFIX} #{name}"
         end
 
-        data_file = File.join(@scratch_dir, name + ".dat").gsub(/[^\w\d_:\.\/-]/, '_')
+        data_file = File.join(@scratch_dir, File.basename(cdb.filename) + ".dat")
         read_data = Hash.new
 
-        data_files.push(data_file)
+        data_files << data_file
 
         read_start, read_end = nil, nil
 
@@ -102,21 +101,19 @@ module CircularDB
 
         File.open(data_file).each do |line|
 
-          time, value = line.split
+          time, value = line.strip.split
+          time  = time.to_i
+          value = value.to_f
 
-          if read_start.nil?
-            read_start = time
-          end
-
+          read_start = time if read_start.nil?
           read_data[time] = value
-
           read_end = time
         end
 
         parsed[data_file] = read_data
 
-        real_start.push(read_start)
-        real_end.push(read_end)
+        real_start << read_start
+        real_end   << read_end
       end
 
       # do the linear interpolation
@@ -125,14 +122,14 @@ module CircularDB
       driver_x_values     = Array.new
       interpolated_values = Hash.new
 
-      accel  = Interpolation::Accel.new
-      interp = Interpolation::Interp.new(Interpolation::LINEAR, driver_x_values.size)
-
       # setup initial xy mapping
       parsed[driver].sort { |a,b| a[0] <=> b[0] }.each do |data|
-        driver_x_values.push(data[0])
+        driver_x_values << data[0]
         interpolated_values[data[0]] = data[1]
       end
+
+      accel  = Interpolation::Accel.new
+      interp = Interpolation::Interp.new(Interpolation::LINEAR, driver_x_values.size)
 
       data_files.each do |follower|
 
@@ -140,22 +137,22 @@ module CircularDB
         follower_y_values = Array.new
 
         parsed[follower].sort { |a,b| a[0] <=> b[0] }.each { |data|
-          follower_x_values.push(data[0])
-          follower_y_values[data[0]] = data[1]
+          follower_x_values << data[0]
+          follower_y_values << data[1]
         }
 
         driver_x_values.each do |x|
 
-          interp.init(follow_xvalues, follow_yvalues)
+          interp.init(follower_x_values, follower_y_values)
 
-          yi = interp.eval(follow_xvalues, follow_yvalues, x, accel)
+          yi = interp.eval(follower_x_values, follower_y_values, x, accel)
 
           interpolated_values[x] += yi
         end
       end
 
       interpolated_values.sort { |a,b| a[0] <=> b[0] }.each do |data|
-        fh.puts "#{a[0]} #{a[1]}"
+        fh.puts "#{data[0]} #{data[1]}"
       end
 
       return real_start[0], real_end[0]
