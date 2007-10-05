@@ -48,7 +48,7 @@ module CircularDB
       @cdbs[0].read_records(start_time, end_time, num_req)
     end
 
-    def print_records(start_time = 0, end_time = 0, num_req = 0, fh = $stdout, for_graphing = 0)
+    def print_records(start_time = 0, end_time = 0, num_req = 0, outfh = STDOUT, for_graphing = 0)
 
       if not File.exists?(@scratch_dir)
         FileUtils.mkdir_p @scratch_dir
@@ -152,7 +152,7 @@ module CircularDB
       end
 
       interpolated_values.sort { |a,b| a[0] <=> b[0] }.each do |data|
-        fh.puts "#{data[0]} #{data[1]}"
+        outfh.puts "#{data[0]} #{data[1]}"
       end
 
       return real_start[0], real_end[0]
