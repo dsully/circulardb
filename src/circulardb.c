@@ -26,11 +26,14 @@ static const char svnid[] __attribute__ ((unused)) = "$Id$";
 #include <time.h>
 #include <unistd.h>
 
+#include <math.h>  
+#include <gsl/gsl_interp.h>
+
 #include <circulardb_interface.h>
 
-// DRK general: why not mmap the arena and treat it as an array to avoid all
-// the "* RECORD_SIZE"
-static void _print_record(FILE *fh, time_t time, double value, char *date_format) {
+/* DRK general: why not mmap the arena and treat it as an array to avoid all the "* RECORD_SIZE" */
+
+static void _print_record(FILE *fh, time_t time, double value, const char *date_format) {
 
     if (date_format == NULL || strcmp(date_format, "") == 0) {
 
@@ -73,13 +76,13 @@ static uint64_t _physical_record_for_logical_record(cdb_header_t *header, int64_
     }
 
     if (logical_record >= header->num_records) {
-        // printf("Can't seek to record [%ld] with only [%"PRIu64"] in db\n", logical_record, header->num_records);
+        /* printf("Can't seek to record [%ld] with only [%"PRIu64"] in db\n", logical_record, header->num_records); */
         return 0;
     }
 
-    // DRK unclear behavior here. Looks like if I specify -N where N >
-    // num_records, I get pointed to #0, but if I specify +N where N >
-    // num_records, it's an error
+    /* DRK unclear behavior here. Looks like if I specify -N where N > 
+       num_records, I get pointed to #0, but if I specify +N where N >
+       num_records, it's an error */
 
     /* Nth logical record (from the beginning) maps to Mth physical record
        in the file, where:
@@ -102,10 +105,6 @@ static uint64_t _seek_to_logical_record(cdb_t *cdb, int64_t logical_record) {
 
     uint64_t physical_record = _physical_record_for_logical_record(cdb->header, logical_record);
     uint64_t offset = HEADER_SIZE + (physical_record * RECORD_SIZE);
-
-    if (physical_record < 0) {
-        return 0;
-    }
 
     if (lseek(cdb->fd, offset, SEEK_SET) != offset) {
         return 0;
@@ -310,12 +309,12 @@ uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
 
     for (i = 0; i < len; i++) {
 
-        //printf("writing record: [%d] [%f]\n", (int)records[i].time, records[i].value);
+        /* printf("writing record: [%d] [%f]\n", (int)records[i].time, records[i].value); */
 
         off_t offset;
 
         if (records[i].time == 0) {
-            // printf("write_records: time == 0; skipping!\n");
+            /* printf("write_records: time == 0; skipping!\n"); */
             continue;
         }
 
@@ -341,7 +340,7 @@ uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
         }
 
         num_recs += 1;
-        // DRK might want to consider periodic syncs?
+        /* DRK might want to consider periodic syncs? */
     }
 
     if (num_recs > 0) {
@@ -376,7 +375,7 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
 
     num_recs = cdb->header->num_records;
 
-    // printf("in update_records with [%ld] num_recs\n", num_recs);
+    /* printf("in update_records with [%ld] num_recs\n", num_recs); */
 
     for (i = 0; i < len; i++) {
 
@@ -386,29 +385,29 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
         time_t rtime;
         uint64_t lrec;
 
-        // printf("updating record: [%d] [%.8g]\n", (int)time, value);
+        /* printf("updating record: [%d] [%.8g]\n", (int)time, value); */
 
         lrec = _logical_record_for_time(cdb, time, 0, 0);
 
         if (lrec >= 1) {
             lrec -= 1;
-            // DRK things like this are extremely confusing. some logical
-            // functions are zero based? some are one? or you're trying to back up?
+            /* DRK things like this are extremely confusing. some logical
+               functions are zero based? some are one? or you're trying to back up? */
         }
 
         rtime = _time_for_logical_record(cdb, lrec);
 
         while (rtime < time && lrec < num_recs - 1) {
 
-            // DRK is this true? or is the condition (lrec - start_lrec) <
-            // num_recs -- seems you can't wrap here (i.e. what if the initial
-            // lrec was num_recs - 1)
+            /* DRK is this true? or is the condition (lrec - start_lrec) <
+               num_recs -- seems you can't wrap here (i.e. what if the initial
+               lrec was num_recs - 1) */
 
             lrec += 1;
             rtime = _time_for_logical_record(cdb, lrec);
         }
 
-        // printf("update_records: lrec [%llu] time [%d] rtime [%d]\n", lrec, time, rtime);
+        /* printf("update_records: lrec [%llu] time [%d] rtime [%d]\n", lrec, time, rtime); */
 
         while (time == rtime && lrec < num_recs - 1) {
 
@@ -420,7 +419,7 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
             _seek_to_logical_record(cdb, lrec);
 
             if (write(cdb->fd, &records[0], RECORD_SIZE) != RECORD_SIZE) {
-                // printf("update_records: Couldn't write record [%s]\n", strerror(errno));
+                /* printf("update_records: Couldn't write record [%s]\n", strerror(errno)); */
                 break;
             }
 
@@ -481,7 +480,206 @@ uint64_t cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end)
     return num_updated;
 }
 
-uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, cdb_record_t **records) {
+static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_records) {
+
+    long factor = 0;
+    int  multiplier = 1;
+
+    if (cdb_read_header(cdb) > 0) {
+        return 0;
+    }
+
+    if (strcmp(cdb->header->type, "counter") == 0) {
+
+        if (*num_records != 0) {
+
+            if (*num_records > 0) {
+                *num_records += 1;
+            } else {
+                *num_records -= 1;
+            }
+        }
+    }
+
+    if (cdb->header->units) {
+
+        char *frequency;
+
+        /* %as is a GNU extension */
+        if (sscanf(cdb->header->units, "per %d %as", &multiplier, &frequency) != 2) {
+
+            sscanf(cdb->header->units, "per %as", &frequency);
+        }
+
+        if (strcmp(frequency, "min") == 0) {
+            factor = 60;
+        } else if (strcmp(frequency, "hour") == 0) {
+            factor = 60 * 60;
+        } else if (strcmp(frequency, "sec") == 0) {
+            factor = 1;
+        } else if (strcmp(frequency, "day") == 0) {
+            factor = 60 * 60 * 24;
+        } else if (strcmp(frequency, "week") == 0) {
+            factor = 60 * 60 * 24 * 7;
+        } else if (strcmp(frequency, "month") == 0) {
+            factor = 60 * 60 * 24 * 30;
+        } else if (strcmp(frequency, "quarter") == 0) {
+            factor = 60 * 60 * 24 * 90;
+        } else if (strcmp(frequency, "year") == 0) {
+            factor = 60 * 60 * 24 * 365;
+        } 
+
+        if (factor != 0) {
+            factor *= multiplier;
+        }
+
+        free(frequency);
+    }
+
+    return factor;
+}
+
+double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time_t start, time_t end, int64_t num_requested) {
+
+    int factor, time_delta, is_counter = 0;
+    uint64_t i, num_recs, seen = 0;
+
+    double new_value = 0;
+    double prev_value = 0;
+    double val_delta = 0;
+    double max = 0;
+    double min = 0;
+    double sum = 0;
+    double ret = 0;
+    double values;
+    time_t total_time = 0;
+    time_t prev_date = 0;
+
+    cdb_record_t *records = NULL;
+
+    if (strcmp(cdb->header->type, "counter") == 0) {
+        is_counter = 1;
+    }
+
+    factor = _compute_scale_factor_and_num_records(cdb, &num_requested);
+
+    num_recs = cdb_read_records(cdb, start, end, num_requested, NULL, NULL, 0, &records);
+
+    /* DRK would be so nice if you could get an iterator into the database
+       instead of having to copy all the values out */
+    for (i = 0; i < num_recs; i++) {
+
+        time_t date  = records[i].time;
+        double value = records[i].value;
+
+        if (!date || date < 0) {
+            continue;
+        }
+
+        if (value == DBL_MAX) {
+            value = DBL_MIN;
+        }
+
+        if (is_counter) {
+
+            new_value = value;
+            value = DBL_MAX;
+
+            if (prev_value != DBL_MAX && new_value != DBL_MAX) {
+
+                val_delta = new_value - prev_value;
+
+                if (val_delta >= 0) {
+                    value = val_delta;
+                }
+            }
+
+            if (value != DBL_MAX) {
+                sum += value;
+            }
+
+            prev_value = new_value;
+        }
+
+        if (factor) {
+
+            if (!prev_date) {
+                prev_date = date;
+                continue;
+            }
+
+            time_delta = date - prev_date;
+
+            if (time_delta > 0 && value != DBL_MAX) {
+
+                value = factor * (value / time_delta);
+
+                total_time += time_delta;
+            }
+
+            prev_date = date;
+        }
+
+        if (value == DBL_MAX) {
+            continue;
+        }
+
+        values += value;
+
+        seen += 1;
+
+        if (!max) max = value; 
+        if (!min) min = value; 
+
+        if (!is_counter) {
+            sum += value;
+        }
+
+        max = value > max ? value : max;
+        min = value < min ? value : min;
+    }
+
+    if (strcmp(function, "median") == 0) {
+
+        /* TODO - need to find a better way to get median. Not currently used, so no big deal. */
+        /* ret = (values[(seen - 1) / 2] + values[seen / 2]) / 2;  */
+        ret = 0;
+
+    } else if (strcmp(function, "average") == 0) {
+
+        if (is_counter) {
+
+            if (total_time) {
+                ret = sum / total_time;
+            }
+
+        } else {
+
+            if (seen) {
+                ret = sum / seen;
+            }
+        }
+
+    } else if (strcmp(function, "sum") == 0) {
+        ret = sum;
+
+    } else if (strcmp(function, "max") == 0) {
+        ret = max;
+
+    } else if (strcmp(function, "min") == 0) {
+        ret = min;
+
+    } else {
+
+        fprintf(stderr, "aggregate_using_function_for_records() function: [%s] not supported\n", function);
+        return -1;
+    }
+
+    return ret;
+}
+
+uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, 
+    time_t *first_time, time_t *last_time, int cooked, cdb_record_t **records) {
 
     int64_t first_requested_logical_record;
     int64_t last_requested_logical_record;
@@ -497,18 +695,18 @@ uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requ
     }
 
     if (start != 0 && end != 0 && end < start) {
-        // printf("End [%ld] has to be >= start [%ld] in time interval requested\n", end, start);
+        /* printf("End [%ld] has to be >= start [%ld] in time interval requested\n", end, start); */
         return -1;
     }
 
     if (cdb->header == NULL || cdb->synced != 1) {
-        // printf("read_records: Nothing to read in [%s]\n", cdb->filename);
+        /* printf("read_records: Nothing to read in [%s]\n", cdb->filename); */
         return -2;
     }
 
     /* bail out if there are no records */
     if (cdb->header->num_records <= 0) {
-        // printf("read_records: No records!\n");
+        /* printf("read_records: No records!\n"); */
         return 0;
     }
 
@@ -603,6 +801,91 @@ uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requ
         nrecs = nrec1 + nrec2;
     }
 
+    /* Deal with cooking the output */
+    if (cooked) {
+
+        int factor = 0;
+        uint64_t i, cooked_recs = 0;
+        double new_value = 0;
+        double prev_value = 0;
+        double val_delta = 0;
+        time_t time_delta = 0;
+        time_t prev_date = 0;
+        
+        cdb_record_t *crecords = malloc(RECORD_SIZE * nrecs);
+
+        factor = _compute_scale_factor_and_num_records(cdb, &num_requested);
+
+        *first_time = buffer[0].time;
+        *last_time  = buffer[nrecs - 1].time;
+
+        for (i = 0; i < nrecs; i++) {
+
+            time_t date  = buffer[i].time;
+            double value = buffer[i].value;
+
+            if (!date || date < 0) {
+                continue;
+            }
+
+            if (value == DBL_MAX) {
+                value = DBL_MIN;
+            }
+
+            if (strcmp(cdb->header->type, "counter") == 0) {
+
+                new_value = value;
+
+                value = DBL_MAX;
+
+                if (prev_value != DBL_MAX && new_value != DBL_MAX) {
+
+                    /* Handle counter wrap arounds */
+                    if (new_value >= prev_value) {
+                        val_delta = new_value - prev_value;
+                    } else {
+                        val_delta = (WRAP_AROUND -prev_value) + new_value;
+                    }
+
+                    if (val_delta >= 0) {
+                        value = val_delta;
+                    }
+                }
+
+                prev_value = new_value;
+            }
+
+            if (factor != 0) {
+
+                /* Skip the first entry, since it's absolute and is needed
+                 * to calculate the second */
+                if (prev_date == 0) {
+                    prev_date = date;
+                    continue;
+                }
+
+                time_delta = date - prev_date;
+
+                if (time_delta > 0 && value != DBL_MAX) {
+                    value = factor * (value / time_delta);
+                }
+
+                prev_date = date;
+            }
+
+            /* Copy the munged data to our new array, since we might skip
+             * elements. Also keep in mind mmap for the future */
+            crecords[cooked_recs].time  = date;
+            crecords[cooked_recs].value = value;
+            cooked_recs += 1;
+        }
+
+        /* Now swap our cooked records for the buffer, so we can slice it as needed. */
+        free(buffer);
+        buffer = crecords;
+        nrecs  = cooked_recs;
+    }
+
     /* now pull out the number of requested records if asked */
     if (num_requested != 0 && nrecs >= abs(num_requested)) {
 
@@ -629,401 +912,26 @@ uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requ
     return nrecs;
 }
 
-static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_records) {
-
-    long factor = 0;
-    int  multiplier = 1;
-
-    if (cdb_read_header(cdb) > 0) {
-        return 0;
-    }
-
-    if (strcmp(cdb->header->type, "counter") == 0) {
-
-        if (*num_records != 0) {
-
-            if (*num_records > 0) {
-                *num_records += 1;
-            } else {
-                *num_records -= 1;
-            }
-        }
-    }
-
-    if (cdb->header->units) {
-
-        char *frequency;
-
-        /* Wow, the POSIX regex API sucks. Don't need PCRE for two silly
-         * regexes though. */
-        regex_t *pat1 = malloc(sizeof(regex_t));
-        regex_t *pat2 = malloc(sizeof(regex_t));
-        regmatch_t match[3];
-
-        regcomp(pat1, "per ([0-9]+)[:space:]*([a-zA-Z]+)", (REG_EXTENDED|REG_ICASE));
-        regcomp(pat2, "per ([a-zA-Z]+)", (REG_EXTENDED|REG_ICASE));
-
-        // #DRK not sure what the config of this is supposed to look like, but
-        // sscanf might be a lot easier here. (sscanf(units, "per %d %s",
-        // &freq,...)) 
-
-        if (regexec(pat1, cdb->header->units, 3, match, 0) == 0) {
-
-            int start1 = match[1].rm_so;
-            int end1   = match[1].rm_eo;
-            int start2 = match[2].rm_so;
-            int end2   = match[2].rm_eo;
-            char mtmp[8];
-
-            frequency = malloc(end2 - start2 + 1);
-
-            strncpy(mtmp, cdb->header->units + start1, end1 - start1);
-            strncpy(frequency, cdb->header->units + start2, end2 - start2);
-
-            multiplier = atoi(mtmp);
-
-        } else if (regexec(pat2, cdb->header->units, 2, match, 0) == 0) {
-
-            int start = match[1].rm_so;
-            int end   = match[1].rm_eo;
-
-            frequency = malloc(end - start + 1);
-
-            strncpy(frequency, cdb->header->units + start, end - start);
-
-        } else {
-
-            frequency = calloc(1, 1);
-        }
-
-        if (strcmp(frequency, "min") == 0) {
-            factor = 60;
-        } else if (strcmp(frequency, "hour") == 0) {
-            factor = 60 * 60;
-        } else if (strcmp(frequency, "sec") == 0) {
-            factor = 1;
-        } else if (strcmp(frequency, "day") == 0) {
-            factor = 60 * 60 * 24;
-        } else if (strcmp(frequency, "week") == 0) {
-            factor = 60 * 60 * 24 * 7;
-        } else if (strcmp(frequency, "month") == 0) {
-            factor = 60 * 60 * 24 * 30;
-        } else if (strcmp(frequency, "quarter") == 0) {
-            factor = 60 * 60 * 24 * 90;
-        } else if (strcmp(frequency, "year") == 0) {
-            factor = 60 * 60 * 24 * 365;
-        } 
-
-        if (factor != 0) {
-            factor *= multiplier;
-        }
-
-        regfree(pat1);
-        regfree(pat2);
-        free(pat1);
-        free(pat2);
-        free(frequency);
-    }
-
-    return factor;
-}
-
-double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time_t start, time_t end, int64_t num_requested) {
-
-    int factor, time_delta, is_counter = 0;
-    uint64_t i, num_recs, seen = 0;
-
-    double new_value = 0;
-    double prev_value = 0;
-    double val_delta = 0;
-    double max = 0;
-    double min = 0;
-    double sum = 0;
-    double ret = 0;
-    double values;
-    time_t total_time = 0;
-    time_t prev_date = 0;
-
-    cdb_record_t *records = NULL;
-
-    if (strcmp(cdb->header->type, "counter") == 0) {
-        is_counter = 1;
-    }
-
-    factor = _compute_scale_factor_and_num_records(cdb, &num_requested);
-
-    num_recs = cdb_read_records(cdb, start, end, num_requested, &records);
-
-    // DRK would be so nice if you could get an iterator into the database
-    // instead of having to copy all the values out
-    for (i = 0; i < num_recs; i++) {
-
-        time_t date  = records[i].time;
-        double value = records[i].value;
-
-        if (!date || date < 0) {
-            continue;
-        }
-
-        if (value == DBL_MAX) {
-            value = DBL_MIN;
-        }
-
-        if (is_counter) {
-
-            new_value = value;
-            value = DBL_MAX;
-
-            if (prev_value != DBL_MAX && new_value != DBL_MAX) {
-
-                val_delta = new_value - prev_value;
-
-                if (val_delta >= 0) {
-                    value = val_delta;
-                }
-            }
-
-            if (value != DBL_MAX) {
-                sum += value;
-            }
-
-            prev_value = new_value;
-        }
-
-        if (factor) {
-
-            if (!prev_date) {
-                prev_date = date;
-                continue;
-            }
-
-            time_delta = date - prev_date;
-
-            if (time_delta > 0 && value != DBL_MAX) {
-
-                value = factor * (value / time_delta);
-
-                total_time += time_delta;
-            }
-
-            prev_date = date;
-        }
-
-        if (value == DBL_MAX) {
-            continue;
-        }
-
-        values += value;
-
-        seen += 1;
-
-        if (!max) max = value; 
-        if (!min) min = value; 
-
-        if (!is_counter) {
-            sum += value;
-        }
-
-        max = value > max ? value : max;
-        min = value < min ? value : min;
-    }
-
-    if (strcmp(function, "median") == 0) {
-
-        // TODO - need to find a better way to get median. Not currently used,
-        // so no big deal.
-        // ret = (values[(seen - 1) / 2] + values[seen / 2]) / 2; 
-        ret = 0;
-
-    } else if (strcmp(function, "average") == 0) {
-
-        if (is_counter) {
-
-            if (total_time) {
-                ret = sum / total_time;
-            }
-
-        } else {
-
-            if (seen) {
-                ret = sum / seen;
-            }
-        }
-
-    } else if (strcmp(function, "sum") == 0) {
-        ret = sum;
-
-    } else if (strcmp(function, "max") == 0) {
-        ret = max;
-
-    } else if (strcmp(function, "min") == 0) {
-        ret = min;
-
-    } else {
-
-        fprintf(stderr, "aggregate_using_function_for_records() function: [%s] not supported\n", function);
-        return -1;
-    }
-
-    return ret;
-}
-
 void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, FILE *fh, 
-        char *date_format, int cooked, time_t *first_time, time_t *last_time) {
+    const char *date_format, int cooked, time_t *first_time, time_t *last_time) {
 
-    int convert, factor = 0;
     uint64_t i, num_recs = 0;
-    double sum = 0;
-    double new_value = 0;
-    double prev_value = 0;
-    double val_delta = 0;
-    time_t time_delta = 0;
-    time_t boundary_date = 0;
-    time_t prev_date = 0;
     
     cdb_record_t *records = NULL;
 
-    if (date_format != NULL) {
-        convert = 1;
-    }
-
-    if (cooked) {
-        factor = _compute_scale_factor_and_num_records(cdb, &num_requested);
-    }
-
-    num_recs = cdb_read_records(cdb, start, end, num_requested, &records);
-
-    if (num_recs == 0) {
-        free(records);
-        return;
-    }
-
-    /* this for event type graphs, we summarize
-       the count number of entries in the db per some time unit,
-       ignoring the value of the records
-    */
-
-    *first_time   = records[0].time;
-    *last_time    = records[num_recs - 1].time;
-    boundary_date = *first_time + factor;
+    num_recs = cdb_read_records(cdb, start, end, num_requested, first_time, last_time, cooked, &records);
 
     for (i = 0; i < num_recs; i++) {
 
-        time_t date  = records[i].time;
-        double value = records[i].value;
-
-        if (!date || date < 0) {
-            continue;
-        }
-
-        if (value == DBL_MAX) {
-            value = DBL_MIN;
-        }
-
-        /*
-         if counter type data, compute rate.
-         account for undef in the db.
-         account for samples that got recorded twice.
-         account for counter wraps
-        */
-        if (cooked == 1) {
-
-            if (strcmp(cdb->header->type, "event") == 0) {
-
-                if (date < *first_time) {
-
-                    continue;
-
-                } else if (date < boundary_date) {
-
-                    sum += value;
-
-                    /* if we have reached end of data without hitting the boundary, go ahead use it */
-                    if (i + 1 == num_recs) {
-                        value = sum;
-                    } else {
-                        continue;
-                    }
-
-                } else {
-
-                    while (date >= boundary_date) {
-
-                        _print_record(fh, (boundary_date - factor), sum, date_format);
-
-                        boundary_date += factor;
-
-                        sum = 0;
-                    }
-
-                    sum = value;
-                    continue;
-                }
-
-            } else {
-
-                if (strcmp(cdb->header->type, "counter") == 0) {
-
-                    new_value = value;
-
-                    value = DBL_MAX;
-
-                    if (prev_value != DBL_MAX && new_value != DBL_MAX) {
-
-                        /* Handle counter wrap arounds */
-                        if (new_value >= prev_value) {
-                            val_delta = new_value - prev_value;
-                        } else {
-                            val_delta = (WRAP_AROUND -prev_value) + new_value;
-                        }
-
-                        if (val_delta >= 0) {
-                            value = val_delta;
-                        }
-                    }
-
-                    prev_value = new_value;
-                }
-
-                if (factor != 0) {
-
-                    /* Skip the first entry, since it's absolute and is needed
-                     * to calculate the second */
-                    if (!prev_date) {
-                        prev_date = date;
-                        continue;
-                    }
-
-                    time_delta = date - prev_date;
-
-                    if (time_delta > 0 && value != DBL_MAX) {
-                        value = factor * (value / time_delta);
-                    }
-
-                    prev_date = date;
-                }
-            }
-        }
-
-        _print_record(fh, date, value, date_format);
-    }
-
-    if (strcmp(cdb->header->type, "event") == 0 && cooked == 1) {
-
-        while (*last_time >= boundary_date) {
-            _print_record(fh, boundary_date - factor, sum, date_format);
-            boundary_date += factor;
-            sum = 0;
-        }
+        _print_record(fh, records[i].time, records[i].value, date_format);
     }
 
     free(records);
-    //printf("first_time: [%d] last_time: [%d]\n", (int)*first_time, (int)*last_time);
 }
 
 void cdb_print(cdb_t *cdb) {
 
-    char date_format[17] = "%Y-%m-%d %H:%M:%S";
+    const char *date_format = "%Y-%m-%d %H:%M:%S";
     time_t first_time, last_time;
 
     printf("============== Header ================\n");
@@ -1037,6 +945,82 @@ void cdb_print(cdb_t *cdb) {
     printf("============== Cooked Records ================\n");
     cdb_print_records(cdb, 0, 0, 0, stderr, date_format, 1, &first_time, &last_time);
     printf("============== End ================\n");
+}
+
+/* Take in an array of cdbs */
+uint64_t cdb_read_aggregate_records(cdb_t **cdbs, time_t start, time_t end, int64_t num_requested,
+    int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records) {
+
+    uint64_t i, driver_num_recs = 0;
+    cdb_record_t *driver_records = NULL;
+
+    /* The first cdb is the driver */
+    driver_num_recs = cdb_read_records(cdbs[0], start, end, num_requested, first_time, last_time, cooked, &driver_records);
+
+    double driver_x_values[driver_num_recs];
+
+    *records = malloc(RECORD_SIZE * driver_num_recs);
+
+    for (i = 0; i < driver_num_recs; i++) {
+
+        driver_x_values[i]  = driver_records[i].time;
+        (*records)[i].time  = driver_records[i].time;
+        (*records)[i].value = driver_records[i].value;
+    }
+
+    /* initialize and allocate the gsl objects  */
+    gsl_interp_accel *accel = gsl_interp_accel_alloc();
+    gsl_interp *interp = gsl_interp_alloc(gsl_interp_linear, driver_num_recs);
+
+    /* cdbs array must be NULL terminated */
+    for (i = 1; cdbs[i] != NULL; i++) {
+
+        uint64_t j, follower_num_recs = 0;
+
+        double follower_x_values[driver_num_recs];
+        double follower_y_values[driver_num_recs];
+
+        cdb_record_t *follower_records = NULL;
+
+        follower_num_recs = cdb_read_records(cdbs[i], start, end, num_requested, first_time, last_time, cooked, &follower_records);
+
+        for (j = 0; j < follower_num_recs; j++) {
+            follower_x_values[j] = (double)follower_records[j].time;
+            follower_y_values[j] = (double)follower_records[j].value;
+        }
+
+        gsl_interp_init(interp, follower_x_values, follower_y_values, follower_num_recs);
+
+        for (j = 0; j < driver_num_recs; j++) {
+
+            (*records)[j].value += gsl_interp_eval(interp, follower_x_values, follower_y_values, driver_x_values[j], accel);
+        }
+
+        free(follower_records);
+    }
+
+    gsl_interp_free(interp);
+    gsl_interp_accel_free(accel);
+    free(driver_records);
+
+    return driver_num_recs;
+}
+
+void cdb_print_aggregate_records(cdb_t **cdbs, time_t start, time_t end, int64_t num_requested,
+    FILE *fh, const char *date_format, int cooked, time_t *first_time, time_t *last_time) {
+
+    uint64_t i, num_recs = 0;
+    
+    cdb_record_t *records = NULL;
+
+    num_recs = cdb_read_aggregate_records(cdbs, start, end, num_requested, cooked, first_time, last_time, &records);
+
+    for (i = 0; i < num_recs; i++) {
+
+        _print_record(fh, records[i].time, records[i].value, date_format);
+    }
+
+    free(records);
 }
 
 void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, char* type, char* units, char* description) {

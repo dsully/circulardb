@@ -78,16 +78,24 @@ bool cdb_update_record(cdb_t *cdb, time_t time, double value);
 
 uint64_t cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end);
 
-uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, cdb_record_t **records);
+uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested,
+    time_t *first_time, time_t *last_time, int cooked, cdb_record_t **records);
 
 double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time_t start, time_t end, int64_t num_requested);
 
 void cdb_print_header(cdb_t * cdb);
 
 void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, FILE *fh, 
-        char *date_format, int cooked, time_t *first_time, time_t *last_time);
+    const char *date_format, int cooked, time_t *first_time, time_t *last_time);
 
 void cdb_print(cdb_t *cdb);
+
+/* Aggregation interface */
+uint64_t cdb_read_aggregate_records(cdb_t **cdbs, time_t start, time_t end, int64_t num_requested,
+    int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records);
+
+void cdb_print_aggregate_records(cdb_t **cdbs, time_t start, time_t end, int64_t num_requested,
+    FILE *fh, const char *date_format, int cooked, time_t *first_time, time_t *last_time);
 
 /* Bones testing */
 extern int circulardb_run(void);
