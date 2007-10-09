@@ -503,7 +503,7 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
 
     if (cdb->header->units) {
 
-        char *frequency;
+        char *frequency = "";
 
         /* %as is a GNU extension */
         if (sscanf(cdb->header->units, "per %d %as", &multiplier, &frequency) != 2) {
@@ -533,7 +533,9 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
             factor *= multiplier;
         }
 
-        free(frequency);
+        if (strcmp(frequency, "") != 0) {
+            free(frequency);
+        }
     }
 
     return factor;
