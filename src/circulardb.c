@@ -503,37 +503,34 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
 
     if (cdb->header->units) {
 
-        char *frequency = "";
+        char *frequency;
 
         /* %as is a GNU extension */
-        if (sscanf(cdb->header->units, "per %d %as", &multiplier, &frequency) != 2) {
+        if ((sscanf(cdb->header->units, "per %d %as", &multiplier, &frequency) == 2) ||
+            (sscanf(cdb->header->units, "per %as", &frequency)) == 1) {
 
-            sscanf(cdb->header->units, "per %as", &frequency);
-        }
+            if (strcmp(frequency, "min") == 0) {
+                factor = 60;
+            } else if (strcmp(frequency, "hour") == 0) {
+                factor = 60 * 60;
+            } else if (strcmp(frequency, "sec") == 0) {
+                factor = 1;
+            } else if (strcmp(frequency, "day") == 0) {
+                factor = 60 * 60 * 24;
+            } else if (strcmp(frequency, "week") == 0) {
+                factor = 60 * 60 * 24 * 7;
+            } else if (strcmp(frequency, "month") == 0) {
+                factor = 60 * 60 * 24 * 30;
+            } else if (strcmp(frequency, "quarter") == 0) {
+                factor = 60 * 60 * 24 * 90;
+            } else if (strcmp(frequency, "year") == 0) {
+                factor = 60 * 60 * 24 * 365;
+            } 
 
-        if (strcmp(frequency, "min") == 0) {
-            factor = 60;
-        } else if (strcmp(frequency, "hour") == 0) {
-            factor = 60 * 60;
-        } else if (strcmp(frequency, "sec") == 0) {
-            factor = 1;
-        } else if (strcmp(frequency, "day") == 0) {
-            factor = 60 * 60 * 24;
-        } else if (strcmp(frequency, "week") == 0) {
-            factor = 60 * 60 * 24 * 7;
-        } else if (strcmp(frequency, "month") == 0) {
-            factor = 60 * 60 * 24 * 30;
-        } else if (strcmp(frequency, "quarter") == 0) {
-            factor = 60 * 60 * 24 * 90;
-        } else if (strcmp(frequency, "year") == 0) {
-            factor = 60 * 60 * 24 * 365;
-        } 
+            if (factor != 0) {
+                factor *= multiplier;
+            }
 
-        if (factor != 0) {
-            factor *= multiplier;
-        }
-
-        if (strcmp(frequency, "") != 0) {
             free(frequency);
         }
     }
