@@ -541,19 +541,20 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
 
 double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time_t start, time_t end, int64_t num_requested) {
 
-    int factor, time_delta, is_counter = 0;
+    int factor, time_delta, is_counter, cooked = 0;
     uint64_t i, num_recs, seen = 0;
 
-    double new_value = 0;
-    double prev_value = 0;
-    double val_delta = 0;
-    double max = 0;
-    double min = 0;
-    double sum = 0;
-    double ret = 0;
+    double new_value = 0.0;
+    double prev_value = 0.0;
+    double val_delta = 0.0;
+    double max = 0.0;
+    double min = 0.0;
+    double sum = 0.0;
+    double ret = 0.0;
     double values;
     time_t total_time = 0;
     time_t prev_date = 0;
+    time_t first_time, last_time;
 
     cdb_record_t *records = NULL;
 
@@ -563,7 +564,7 @@ double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time
 
     factor = _compute_scale_factor_and_num_records(cdb, &num_requested);
 
-    num_recs = cdb_read_records(cdb, start, end, num_requested, NULL, NULL, 0, &records);
+    num_recs = cdb_read_records(cdb, start, end, num_requested, cooked, &first_time, &last_time, &records);
 
     /* DRK would be so nice if you could get an iterator into the database
        instead of having to copy all the values out */
@@ -639,6 +640,8 @@ double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time
         min = value < min ? value : min;
     }
 
+    free(records);
+
     if (strcmp(function, "median") == 0) {
 
         /* TODO - need to find a better way to get median. Not currently used, so no big deal. */
@@ -679,7 +682,7 @@ double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time
 }
 
 uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, 
-    time_t *first_time, time_t *last_time, int cooked, cdb_record_t **records) {
+    int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records) {
 
     int64_t first_requested_logical_record;
     int64_t last_requested_logical_record;
@@ -806,11 +809,11 @@ uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requ
 
         int factor = 0;
         uint64_t i, cooked_recs = 0;
-        double new_value = 0;
-        double prev_value = 0;
-        double val_delta = 0;
+        double new_value  = 0.0;
+        double prev_value = 0.0;
+        double val_delta  = 0.0;
         time_t time_delta = 0;
-        time_t prev_date = 0;
+        time_t prev_date  = 0;
         
         cdb_record_t *crecords = malloc(RECORD_SIZE * nrecs);
 
@@ -919,7 +922,7 @@ void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_request
     
     cdb_record_t *records = NULL;
 
-    num_recs = cdb_read_records(cdb, start, end, num_requested, first_time, last_time, cooked, &records);
+    num_recs = cdb_read_records(cdb, start, end, num_requested, cooked, first_time, last_time, &records);
 
     for (i = 0; i < num_recs; i++) {
 
@@ -955,7 +958,7 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, time_t start, time_t end, int6
     cdb_record_t *driver_records = NULL;
 
     /* The first cdb is the driver */
-    driver_num_recs = cdb_read_records(cdbs[0], start, end, num_requested, first_time, last_time, cooked, &driver_records);
+    driver_num_recs = cdb_read_records(cdbs[0], start, end, num_requested, cooked, first_time, last_time, &driver_records);
 
     double driver_x_values[driver_num_recs];
 
@@ -982,7 +985,7 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, time_t start, time_t end, int6
 
         cdb_record_t *follower_records = NULL;
 
-        follower_num_recs = cdb_read_records(cdbs[i], start, end, num_requested, first_time, last_time, cooked, &follower_records);
+        follower_num_recs = cdb_read_records(cdbs[i], start, end, num_requested, cooked, first_time, last_time, &follower_records);
 
         for (j = 0; j < follower_num_recs; j++) {
             follower_x_values[j] = (double)follower_records[j].time;

@@ -79,7 +79,7 @@ bool cdb_update_record(cdb_t *cdb, time_t time, double value);
 uint64_t cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end);
 
 uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested,
-    time_t *first_time, time_t *last_time, int cooked, cdb_record_t **records);
+    int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records);
 
 double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time_t start, time_t end, int64_t num_requested);
 
