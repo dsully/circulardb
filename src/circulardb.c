@@ -26,7 +26,9 @@ static const char svnid[] __attribute__ ((unused)) = "$Id$";
 #include <time.h>
 #include <unistd.h>
 
+/* For the aggretgation interface */
 #include <math.h>  
+#include <gsl/gsl_errno.h>
 #include <gsl/gsl_interp.h>
 
 #include <circulardb_interface.h>
@@ -950,7 +952,7 @@ void cdb_print(cdb_t *cdb) {
 }
 
 /* Take in an array of cdbs */
-uint64_t cdb_read_aggregate_records(cdb_t **cdbs, time_t start, time_t end, int64_t num_requested,
+uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
     int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records) {
 
     uint64_t i, driver_num_recs = 0;
@@ -974,8 +976,10 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, time_t start, time_t end, int6
     gsl_interp_accel *accel = gsl_interp_accel_alloc();
     gsl_interp *interp = gsl_interp_alloc(gsl_interp_linear, driver_num_recs);
 
-    /* cdbs array must be NULL terminated */
-    for (i = 1; cdbs[i] != NULL; i++) {
+    /* Useful for debugging */
+    /* gsl_set_error_handler_off(); */
+
+    for (i = 1; i < num_cdbs; i++) {
 
         uint64_t j, follower_num_recs = 0;
 
@@ -985,6 +989,10 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, time_t start, time_t end, int6
         cdb_record_t *follower_records = NULL;
 
         follower_num_recs = cdb_read_records(cdbs[i], start, end, num_requested, cooked, first_time, last_time, &follower_records);
+
+        if (follower_num_recs == 0) {
+            continue;
+        }
 
         for (j = 0; j < follower_num_recs; j++) {
             follower_x_values[j] = (double)follower_records[j].time;
@@ -1008,14 +1016,14 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, time_t start, time_t end, int6
     return driver_num_recs;
 }
 
-void cdb_print_aggregate_records(cdb_t **cdbs, time_t start, time_t end, int64_t num_requested,
+void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
     FILE *fh, const char *date_format, int cooked, time_t *first_time, time_t *last_time) {
 
     uint64_t i, num_recs = 0;
     
     cdb_record_t *records = NULL;
 
-    num_recs = cdb_read_aggregate_records(cdbs, start, end, num_requested, cooked, first_time, last_time, &records);
+    num_recs = cdb_read_aggregate_records(cdbs, num_cdbs, start, end, num_requested, cooked, first_time, last_time, &records);
 
     for (i = 0; i < num_recs; i++) {
 

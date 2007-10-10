@@ -91,10 +91,10 @@ void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_request
 void cdb_print(cdb_t *cdb);
 
 /* Aggregation interface */
-uint64_t cdb_read_aggregate_records(cdb_t **cdbs, time_t start, time_t end, int64_t num_requested,
+uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
     int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records);
 
-void cdb_print_aggregate_records(cdb_t **cdbs, time_t start, time_t end, int64_t num_requested,
+void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
     FILE *fh, const char *date_format, int cooked, time_t *first_time, time_t *last_time);
 
 /* Bones testing */
