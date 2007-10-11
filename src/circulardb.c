@@ -446,7 +446,8 @@ bool cdb_update_record(cdb_t *cdb, time_t time, double value) {
 
 uint64_t cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end) {
 
-    uint64_t i, num_updated = 0;
+    uint64_t i = 0;
+    uint64_t num_updated = 0;
     int64_t lrec;
     off_t offset = RECORD_SIZE;
 
@@ -542,9 +543,13 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
 
 double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time_t start, time_t end, int64_t num_requested) {
 
-    int factor, time_delta, is_counter, cooked = 0;
-    uint64_t i, num_recs, seen = 0;
-
+    int factor = 0;
+    int time_delta = 0;
+    int is_counter = 0;
+    int cooked = 0;
+    uint64_t i = 0;
+    uint64_t num_recs = 0;
+    uint64_t seen = 0;
     double new_value = 0.0;
     double prev_value = 0.0;
     double val_delta = 0.0;
@@ -605,7 +610,7 @@ double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time
 
         if (factor) {
 
-            if (!prev_date) {
+            if (prev_date == 0) {
                 prev_date = date;
                 continue;
             }
@@ -809,7 +814,9 @@ uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requ
     if (cooked) {
 
         int factor = 0;
-        uint64_t i, cooked_recs = 0;
+        int is_counter = 0;
+        uint64_t i = 0;
+        uint64_t cooked_recs = 0;
         double new_value  = 0.0;
         double prev_value = 0.0;
         double val_delta  = 0.0;
@@ -822,6 +829,10 @@ uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requ
 
         *first_time = buffer[0].time;
         *last_time  = buffer[nrecs - 1].time;
+
+        if (strcmp(cdb->header->type, "counter") == 0) {
+            is_counter = 1;
+        }
 
         for (i = 0; i < nrecs; i++) {
 
@@ -836,7 +847,7 @@ uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requ
                 value = DBL_MIN;
             }
 
-            if (strcmp(cdb->header->type, "counter") == 0) {
+            if (is_counter) {
 
                 new_value = value;
 
@@ -919,7 +930,8 @@ uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requ
 void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, FILE *fh, 
     const char *date_format, int cooked, time_t *first_time, time_t *last_time) {
 
-    uint64_t i, num_recs = 0;
+    uint64_t i = 0;
+    uint64_t num_recs = 0;
     
     cdb_record_t *records = NULL;
 
@@ -955,14 +967,17 @@ void cdb_print(cdb_t *cdb) {
 uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
     int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records) {
 
-    uint64_t i, driver_num_recs = 0;
+    uint64_t i = 0;
+    uint64_t driver_num_recs = 0;
     cdb_record_t *driver_records = NULL;
 
     /* The first cdb is the driver */
     driver_num_recs = cdb_read_records(cdbs[0], start, end, num_requested, cooked, first_time, last_time, &driver_records);
 
-    double driver_x_values[driver_num_recs];
-    double driver_y_values[driver_num_recs];
+    double *driver_x_values   = malloc(sizeof(double) * driver_num_recs);
+    double *driver_y_values   = malloc(sizeof(double) * driver_num_recs);
+    double *follower_x_values = malloc(sizeof(double) * driver_num_recs);
+    double *follower_y_values = malloc(sizeof(double) * driver_num_recs);
 
     *records = malloc(RECORD_SIZE * driver_num_recs);
 
@@ -982,10 +997,8 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
 
     for (i = 1; i < num_cdbs; i++) {
 
-        uint64_t j, follower_num_recs = 0;
-
-        double follower_x_values[driver_num_recs];
-        double follower_y_values[driver_num_recs];
+        uint64_t j = 0;
+        uint64_t follower_num_recs = 0;
 
         cdb_record_t *follower_records = NULL;
 
@@ -1017,6 +1030,11 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
         free(follower_records);
     }
 
+    free(driver_x_values);
+    free(driver_y_values);
+    free(follower_x_values);
+    free(follower_y_values);
+
     gsl_interp_free(interp);
     gsl_interp_accel_free(accel);
     free(driver_records);
@@ -1027,8 +1045,9 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
 void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
     FILE *fh, const char *date_format, int cooked, time_t *first_time, time_t *last_time) {
 
-    uint64_t i, num_recs = 0;
-    
+    uint64_t i = 0;
+    uint64_t num_recs = 0;
+ 
     cdb_record_t *records = NULL;
 
     num_recs = cdb_read_aggregate_records(cdbs, num_cdbs, start, end, num_requested, cooked, first_time, last_time, &records);
