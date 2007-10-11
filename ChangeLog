@@ -1,3 +1,7 @@
+Version 0.1.3 (dan)
+	* Add wrappers for aggregation functions.
+	* Update for new cdb_read_records() API.
+
 Version 0.1.2 (dan)
 	* Pass in flags & mode for file open.
 	* Raise exceptions to the Ruby layer.

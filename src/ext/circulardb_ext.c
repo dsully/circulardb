@@ -13,6 +13,7 @@
 
 static VALUE mCircularDB;
 static VALUE cStorage;
+static VALUE cAggregate;
 
 /* Cleanup after an object has been GCed */
 static void cdb_rb_free(void *p) {
@@ -155,23 +156,33 @@ static VALUE _set_header(VALUE self, VALUE name, VALUE value) {
 
 static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
 
-    VALUE start, end, num_req, array;
+    VALUE start, end, num_req, cooked, array;
 
     uint64_t i   = 0;
     uint64_t cnt = 0;
+    time_t first_time, last_time;
 
     cdb_t *cdb;
     cdb_record_t *records = NULL;
 
-    rb_scan_args(argc, argv, "03", &start, &end, &num_req);
+    rb_scan_args(argc, argv, "04", &start, &end, &num_req, &cooked);
 
     if (NIL_P(start))   start   = INT2FIX(0);
     if (NIL_P(end))     end     = INT2FIX(0);
     if (NIL_P(num_req)) num_req = INT2FIX(0);
+    if (NIL_P(cooked))   cooked = INT2FIX(0);
 
     Data_Get_Struct(self, cdb_t, cdb);
 
-    cnt = cdb_read_records(cdb, NUM2UINT(start), NUM2UINT(end), rb_num2ull(num_req), &records);
+    cnt = cdb_read_records(cdb,
+        NUM2UINT(start),
+        NUM2UINT(end),
+        rb_num2ull(num_req),
+        cooked,
+        &first_time,
+        &last_time,
+        &records
+    );
 
     switch (cnt) {
         case -1: rb_raise(rb_eStandardError, "End time must be >= Start time.");
@@ -425,10 +436,123 @@ static VALUE cdb_rb_aggregate_using_function_for_records(int argc, VALUE *argv, 
     return rb_float_new(ret);
 }
 
+static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
+
+    VALUE start, end, num_req, cooked, array;
+    VALUE cdb_objects = rb_iv_get(self, "@cdbs");
+
+    uint64_t i   = 0;
+    uint64_t cnt = 0;
+    int num_cdbs = RARRAY(cdb_objects)->len;
+
+    /* initialize the cdbs array to the size of the cdb_objects array */
+    cdb_t *cdbs[num_cdbs];
+    cdb_record_t *records = NULL;
+    time_t first_time, last_time;
+
+    rb_scan_args(argc, argv, "04", &start, &end, &num_req, &cooked);
+
+    if (NIL_P(start))   start   = INT2FIX(0);
+    if (NIL_P(end))     end     = INT2FIX(0);
+    if (NIL_P(num_req)) num_req = INT2FIX(0);
+    if (NIL_P(cooked))  cooked  = INT2FIX(0);
+
+    /* First, loop over the incoming array of CircularDB::Storage objects and
+     * extract the pointers to the cdb_t structs. */
+    for (i = 0; i < num_cdbs; i++) {
+        Data_Get_Struct(RARRAY(cdb_objects)->ptr[i], cdb_t, cdbs[i]);
+    }
+
+    cnt = cdb_read_aggregate_records(
+        cdbs,
+        num_cdbs,
+        NUM2UINT(start),
+        NUM2UINT(end),
+        rb_num2ull(num_req),
+        NUM2UINT(cooked),
+        &first_time,
+        &last_time,
+        &records
+    );
+
+    array = rb_ary_new2(cnt);
+
+    for (i = 0; i < cnt; i++) {
+
+        VALUE entry = rb_ary_new2(2);
+
+        rb_ary_store(entry, 0, ULONG2NUM(records[i].time));
+        
+        if (records[i].value == DBL_MIN) {
+            rb_ary_store(entry, 1, Qnil);
+        } else {
+            rb_ary_store(entry, 1, rb_float_new(records[i].value));
+        }
+
+        rb_ary_store(array, i, entry);
+    }
+
+    return array;
+}
+
+static VALUE cdb_agg_rb_print_records(int argc, VALUE *argv, VALUE self) {
+
+    VALUE start, end, num_req, file_obj, date_format, cooked, array;
+    VALUE cdb_objects = rb_iv_get(self, "@cdbs");
+
+    uint64_t i   = 0;
+    int num_cdbs = RARRAY(cdb_objects)->len;
+
+    /* initialize the cdbs array to the size of the cdb_objects array */
+    cdb_t *cdbs[num_cdbs];
+    time_t first_time, last_time;
+
+    rb_scan_args(argc, argv, "06", &start, &end, &num_req, &file_obj, &date_format, &cooked);
+
+    if (NIL_P(start))   start   = INT2FIX(0);
+    if (NIL_P(end))     end     = INT2FIX(0);
+    if (NIL_P(num_req)) num_req = INT2FIX(0);
+    if (NIL_P(cooked))  cooked  = INT2FIX(0);
+
+    if (NIL_P(date_format)) {
+        date_format = rb_str_new2("");
+    }
+
+    if (NIL_P(file_obj)) {
+        file_obj = rb_const_get(cStorage, rb_intern("STDERR"));
+    }
+
+    /* First, loop over the incoming array of CircularDB::Storage objects and
+     * extract the pointers to the cdb_t structs. */
+    for (i = 0; i < num_cdbs; i++) {
+        Data_Get_Struct(RARRAY(cdb_objects)->ptr[i], cdb_t, cdbs[i]);
+    }
+
+    cdb_print_aggregate_records(
+        cdbs,
+        num_cdbs,
+        NUM2UINT(start),
+        NUM2UINT(end),
+        rb_num2ull(num_req),
+        RFILE(file_obj)->fptr->f,
+        StringValuePtr(date_format),
+        NUM2UINT(cooked),
+        &first_time,
+        &last_time
+    );
+
+    array = rb_ary_new2(2);
+    rb_ary_store(array, 0, UINT2NUM(first_time));
+    rb_ary_store(array, 1, UINT2NUM(last_time));
+
+    return array;
+}
+
 void Init_circulardb_ext() {
 
     mCircularDB = rb_const_get(rb_cObject, rb_intern("CircularDB"));
     cStorage    = rb_define_class_under(mCircularDB, "Storage", rb_cObject);
+    cAggregate  = rb_define_class_under(mCircularDB, "Aggregate", rb_cObject);
 
     rb_define_alloc_func(cStorage, cdb_rb_alloc);
 
@@ -448,4 +572,7 @@ void Init_circulardb_ext() {
     rb_define_method(cStorage, "print_records", cdb_rb_print_records, -1); 
     rb_define_method(cStorage, "aggregate_using_function_for_records", cdb_rb_aggregate_using_function_for_records, -1); 
     rb_define_method(cStorage, "_set_header", _set_header, 2); 
+
+    rb_define_method(cAggregate, "read_records", cdb_agg_rb_read_records, -1); 
+    rb_define_method(cAggregate, "print_records", cdb_agg_rb_print_records, -1); 
 }
