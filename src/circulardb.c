@@ -943,11 +943,11 @@ void cdb_print(cdb_t *cdb) {
     cdb_print_header(cdb);
 
     printf("============== Records ================\n");
-    cdb_print_records(cdb, 0, 0, 0, stderr, date_format, 0, &first_time, &last_time);
+    cdb_print_records(cdb, 0, 0, 0, stdout, date_format, 0, &first_time, &last_time);
     printf("============== End ================\n");
 
     printf("============== Cooked Records ================\n");
-    cdb_print_records(cdb, 0, 0, 0, stderr, date_format, 1, &first_time, &last_time);
+    cdb_print_records(cdb, 0, 0, 0, stdout, date_format, 1, &first_time, &last_time);
     printf("============== End ================\n");
 }
 
@@ -962,14 +962,13 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
     driver_num_recs = cdb_read_records(cdbs[0], start, end, num_requested, cooked, first_time, last_time, &driver_records);
 
     double driver_x_values[driver_num_recs];
+    double driver_y_values[driver_num_recs];
 
     *records = malloc(RECORD_SIZE * driver_num_recs);
 
     for (i = 0; i < driver_num_recs; i++) {
-
-        driver_x_values[i]  = driver_records[i].time;
-        (*records)[i].time  = driver_records[i].time;
-        (*records)[i].value = driver_records[i].value;
+        (*records)[i].time  = driver_x_values[i] = driver_records[i].time;
+        (*records)[i].value = driver_y_values[i] = driver_records[i].value;
     }
 
     /* initialize and allocate the gsl objects  */
@@ -978,6 +977,8 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
 
     /* Useful for debugging */
     /* gsl_set_error_handler_off(); */
+
+    gsl_interp_init(interp, driver_x_values, driver_y_values, driver_num_recs);
 
     for (i = 1; i < num_cdbs; i++) {
 
@@ -988,22 +989,29 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
 
         cdb_record_t *follower_records = NULL;
 
+        /* follower can't have more records than the driver */
+        if (cdbs[i]->header->num_records < driver_num_recs) {
+            continue;
+        }
+
         follower_num_recs = cdb_read_records(cdbs[i], start, end, num_requested, cooked, first_time, last_time, &follower_records);
 
         if (follower_num_recs == 0) {
             continue;
         }
 
-        for (j = 0; j < follower_num_recs; j++) {
-            follower_x_values[j] = (double)follower_records[j].time;
-            follower_y_values[j] = (double)follower_records[j].value;
+        for (j = 0; j < driver_num_recs; j++) {
+            follower_x_values[j] = follower_records[j].time;
+            follower_y_values[j] = follower_records[j].value;
         }
-
-        gsl_interp_init(interp, follower_x_values, follower_y_values, follower_num_recs);
 
         for (j = 0; j < driver_num_recs; j++) {
 
-            (*records)[j].value += gsl_interp_eval(interp, follower_x_values, follower_y_values, driver_x_values[j], accel);
+            double yi = gsl_interp_eval(interp, follower_x_values, follower_y_values, driver_x_values[j], accel);
+
+            if (isnormal(yi)) {
+                (*records)[j].value += yi;
+            }
         }
 
         free(follower_records);
