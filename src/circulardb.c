@@ -510,7 +510,8 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
 
         /* %as is a GNU extension */
         if ((sscanf(cdb->header->units, "per %d %as", &multiplier, &frequency) == 2) ||
-            (sscanf(cdb->header->units, "per %as", &frequency)) == 1) {
+            (sscanf(cdb->header->units, "per %as", &frequency) == 1) ||
+            (sscanf(cdb->header->units, "%*s per %as", &frequency) == 1)) {
 
             if (strcmp(frequency, "min") == 0) {
                 factor = 60;
