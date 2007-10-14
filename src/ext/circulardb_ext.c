@@ -207,6 +207,8 @@ static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
         rb_ary_store(array, i, entry);
     }
 
+    free(records);
+
     _cdb_rb_update_header_hash(self, cdb);
 
     return array;
@@ -491,6 +493,8 @@ static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
 
         rb_ary_store(array, i, entry);
     }
+
+    free(records);
 
     return array;
 }
