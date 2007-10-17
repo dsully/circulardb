@@ -233,6 +233,18 @@ static int64_t _logical_record_for_time(cdb_t *cdb, time_t req_time, int64_t sta
     return _logical_record_for_time(cdb, req_time, start_logical_record, end_logical_record);
 }
 
+int _cdb_is_writable(cdb_t *cdb) {
+
+    /* We can't check for the O_RDONLY bit being because its defined value is zero.
+     * i.e. there are no bits set to look for. We therefore assume 
+     * O_RDONLY if neither O_WRONLY nor O_RDWR are set. */
+    if (cdb->flags & O_RDWR) {
+        return 1;
+    }
+
+    return 0;
+}
+
 int cdb_read_header(cdb_t *cdb) {
 
     /* if the header has already been read from backing store do not read again */
@@ -257,7 +269,7 @@ int cdb_write_header(cdb_t *cdb) {
 
     time_t now;
 
-    if (cdb->header != NULL && cdb->synced == 1) {
+    if (!_cdb_is_writable(cdb) || cdb->synced == 1) {
         return 0;
     }
 
@@ -308,6 +320,8 @@ uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
     if (cdb_read_header(cdb) > 0) {
         return 0;
     }
+
+    assert(_cdb_is_writable(cdb));
 
     for (i = 0; i < len; i++) {
 
@@ -375,6 +389,8 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
         return 0;
     }
 
+    assert(_cdb_is_writable(cdb));
+
     num_recs = cdb->header->num_records;
 
     /* printf("in update_records with [%ld] num_recs\n", num_recs); */
@@ -431,6 +447,14 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
         }
     }
 
+    if (i > 0) {
+        cdb->synced = 0;
+    }
+
+    if (cdb_write_header(cdb) > 0) {
+        return 0;
+    }
+
     return i;
 }
 
@@ -454,6 +478,8 @@ uint64_t cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end)
     if (cdb_read_header(cdb) > 0) {
         return 0;
     }
+
+    assert(_cdb_is_writable(cdb));
 
     lrec = _logical_record_for_time(cdb, start, 0, 0);
 
@@ -777,7 +803,7 @@ uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requ
         uint64_t nrec = (last_requested_physical_record - seek_physical_record + 1);
         uint64_t rlen = RECORD_SIZE * nrec;
 
-        buffer = malloc(rlen);
+        buffer = calloc(1, rlen);
 
         /* one slurp - XXX TODO - mmap */
         if (read(cdb->fd, buffer, rlen) != rlen) {
@@ -796,7 +822,7 @@ uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requ
         uint64_t rlen1 = RECORD_SIZE * nrec1;
         uint64_t rlen2 = RECORD_SIZE * nrec2;
 
-        buffer = malloc(rlen1 + rlen2);
+        buffer = calloc(1, rlen1 + rlen2);
 
         if (read(cdb->fd, buffer, rlen1) != rlen1) {
             free(buffer);
@@ -824,7 +850,7 @@ uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requ
         time_t time_delta = 0;
         time_t prev_date  = 0;
         
-        cdb_record_t *crecords = malloc(RECORD_SIZE * nrecs);
+        cdb_record_t *crecords = calloc(nrecs, RECORD_SIZE);
 
         factor = _compute_scale_factor_and_num_records(cdb, &num_requested);
 
@@ -914,7 +940,7 @@ uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requ
 
         nrecs = abs(num_requested);
 
-        *records = malloc(RECORD_SIZE * nrecs);
+        *records = calloc(nrecs, RECORD_SIZE);
 
         memcpy(*records, &buffer[start_index], RECORD_SIZE * nrecs);
 
@@ -975,12 +1001,12 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
     /* The first cdb is the driver */
     driver_num_recs = cdb_read_records(cdbs[0], start, end, num_requested, cooked, first_time, last_time, &driver_records);
 
-    double *driver_x_values   = malloc(sizeof(double) * driver_num_recs);
-    double *driver_y_values   = malloc(sizeof(double) * driver_num_recs);
-    double *follower_x_values = malloc(sizeof(double) * driver_num_recs);
-    double *follower_y_values = malloc(sizeof(double) * driver_num_recs);
+    double *driver_x_values   = calloc(driver_num_recs, sizeof(double));
+    double *driver_y_values   = calloc(driver_num_recs, sizeof(double));
+    double *follower_x_values = calloc(driver_num_recs, sizeof(double));
+    double *follower_y_values = calloc(driver_num_recs, sizeof(double));
 
-    *records = malloc(RECORD_SIZE * driver_num_recs);
+    *records = calloc(driver_num_recs, RECORD_SIZE);
 
     for (i = 0; i < driver_num_recs; i++) {
         (*records)[i].time  = driver_x_values[i] = driver_records[i].time;
@@ -991,8 +1017,8 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
     gsl_interp_accel *accel = gsl_interp_accel_alloc();
     gsl_interp *interp = gsl_interp_alloc(gsl_interp_linear, driver_num_recs);
 
-    /* Useful for debugging */
-    /* gsl_set_error_handler_off(); */
+    /* Allows 0.0 to be returned as a valid yi */
+    gsl_set_error_handler_off();
 
     gsl_interp_init(interp, driver_x_values, driver_y_values, driver_num_recs);
 
@@ -1099,11 +1125,8 @@ void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, char* typ
 
 cdb_t* cdb_new(void) {
 
-    cdb_t *cdb = malloc(sizeof(cdb_t));
-    memset(cdb, 0, sizeof(cdb_t));
-
-    cdb->header = malloc(HEADER_SIZE);
-    memset(cdb->header, 0, HEADER_SIZE);
+    cdb_t *cdb  = calloc(1, sizeof(cdb_t));
+    cdb->header = calloc(1, HEADER_SIZE);
 
     cdb->fd = -1;
     cdb->synced = 0;
@@ -1121,6 +1144,9 @@ int cdb_open(cdb_t *cdb) {
         if (cdb->flags == -1) {
             cdb->flags = O_RDONLY;
         }
+
+        /* A cdb can't be write only - we need to read the header */
+        assert(!(cdb->flags & O_WRONLY));
 
         if (cdb->mode == -1) {
             cdb->mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
@@ -1140,8 +1166,10 @@ int cdb_close(cdb_t *cdb) {
 
     if (cdb != NULL) {
 
-        if (cdb_write_header(cdb) > 0) {
-            return errno;
+        if (_cdb_is_writable(cdb)) {
+            if (cdb_write_header(cdb) > 0) {
+                return errno;
+            }
         }
 
         if (cdb->fd > 0) {
@@ -1162,13 +1190,14 @@ void cdb_free(cdb_t *cdb) {
 
     if (cdb != NULL) {
 
-        cdb_close(cdb);
-
         if (cdb->header != NULL) {
+            cdb_close(cdb);
             free(cdb->header);
+            cdb->header = NULL;
         }
 
         free(cdb);
+        cdb = NULL;
     }
 }
 
