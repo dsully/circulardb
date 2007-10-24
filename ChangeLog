@@ -1,6 +1,8 @@
 Version 0.1.3 (dan)
 	* Add wrappers for aggregation functions.
 	* Update for new cdb_read_records() API.
+	* Add tests for aggregation.
+	* Fix memory leak in the read_records routines.
 
 Version 0.1.2 (dan)
 	* Pass in flags & mode for file open.

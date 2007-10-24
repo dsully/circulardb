@@ -4,7 +4,6 @@ module CircularDB
 
     require 'rubygems'
     require 'fileutils'
-    require 'tempfile'
 
     begin
       require 'gnuplot'
@@ -41,10 +40,6 @@ module CircularDB
       self.show_data    = 1
       self.show_trend   = 0
       self.fix_logscale = 0.0000001
-
-      # For whatever reason, "tmpdir" doesn't exist as a standard Ruby library. This
-      # seems like a reasonable substitute.
-      @scratch_dir = Tempfile.new('gnuplot' << Time.now.to_i.to_s).close!.path
     end
 
     def size=(size)
@@ -117,11 +112,7 @@ module CircularDB
       styles = [3, 1, 2, 9, 10, 8, 7, 13]
 
       if (@start_time and @end_time and @start_time >= @end_time)
-        raise "Start time #{@start_time} should be less than end time #{@end_time}\n"
-      end
-
-      unless File.exists?(@scratch_dir)
-        FileUtils.mkdir_p @scratch_dir
+        #raise "Start time #{@start_time} should be less than end time #{@end_time}\n"
       end
 
       # Debug gnuplot scripts with:
@@ -176,9 +167,7 @@ module CircularDB
 
           @cdbs.keys.sort.each do |name|
 
-            cdb        = @cdbs[name]
-            real_start = 0
-            real_end   = 0
+            cdb = @cdbs[name]
 
             if cdb.num_records == 0
               puts "No records to plot for: #{cdb.filename}"
@@ -195,20 +184,17 @@ module CircularDB
               next
             end
 
-            # Write out the temporary data file for gnuplot to read.
-            data_file = File.join(@scratch_dir, File.basename(cdb.filename) + ".dat")
+            records = cdb.read_records(@start_time, @end_time, nil, for_graphing)
 
-            # Gnuplot can read data from a file much faster than us building up objects
-            # for a dataset. Uses much less memory as well.
-            File.open(data_file, File::RDWR|File::CREAT) { |fh|
-              real_start, real_end = cdb.print_records(@start_time, @end_time, nil, fh, nil, for_graphing)
-            }
-
-            if File.stat(data_file).zero?
-              puts "Data file is empty for: #{cdb.filename}"
-              plots -= 1
+            if records.first.nil? or records.last.nil?
+              puts cdb.filename
+              pp records.first
+              pp records.last
               next
             end
+
+            real_start = records.first.first
+            real_end   = records.last.first
 
             # Silence gnuplot warnings.
             if name =~ /temperature/i
@@ -264,16 +250,24 @@ module CircularDB
 
               # Fixup dev names.
               name.gsub!(/_/, '/')
-              
-              plot.cmd << " \"#{data_file}\" using 1:#{yaxis} "
+              div = cdb.size
 
-              if @show_data and @show_trend == 0
-                plot.cmd << "axes #{axis} title \"#{name}\" "
-              elsif @show_trend
-                plot.cmd << "smooth bezier axes #{axis} title \"#{name}\" "
+              # Divide by number of cdbs (aggregate) or 1.0 (single).
+              # This should be configurable.
+              x = records.collect { |r| r[0] }
+              y = records.collect { |r| r[1] / div }
+
+              plot.data << Gnuplot::DataSet.new([x, y]) do |ds|
+
+                ds.title = name
+                ds.with  = "#{@style} lw 1.5 lt #{styles[num_plots]}"
+
+                if @show_data and @show_trend == 0
+                  ds.using = "1:#{yaxis} axes #{axis}"
+                elsif @show_trend
+                  ds.using = "1:#{yaxis} smooth bezier axes #{axis}"
+                end
               end
-
-              plot.cmd << "with #{@style} lw 1.5 lt #{styles[num_plots]},"
 
               num_plots += 1
               num_plots %= styles.length
@@ -296,9 +290,6 @@ module CircularDB
             puts "Nothing to plot!"
             return
           end
-
-          # Zap the trailing comma.
-          plot.cmd.chop!
 
           axes.each_pair do |units,axis|
 
@@ -360,27 +351,9 @@ module CircularDB
     end
 
     def close
-      if File.exists?(@scratch_dir)
-        FileUtils.rm_rf @scratch_dir
-      end
-
-      @cdbs = []
+      @cdbs.values.each { |cdb| cdb.close }
+      @cdbs = nil
     end
 
   end
-end
-
-
-
-# Override to_gplot to send the script to gnuplot without caring about data.
-begin
-  class Gnuplot::Plot
-
-    def to_gplot (io = "")
-      @sets.each { |var, val| io << "set #{var} #{val}\n" }
-      io << @cmd << "\nunset output\n"
-      io
-    end
-  end
-rescue NameError
 end

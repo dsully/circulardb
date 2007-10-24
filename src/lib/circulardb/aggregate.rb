@@ -62,11 +62,20 @@ module CircularDB
     end
 
     def num_records
-      cdbs[0].num_records
+      @cdbs[0].num_records
     end
 
     def last_updated
-      cdbs[0].last_updated
+      @cdbs[0].last_updated
+    end
+
+    # Dummy - only used by graph right now. May need to make this real in the future.
+    def aggregate_using_function_for_records(function = nil, start_time = 0, end_time = 0)
+      1.0
+    end
+
+    def size
+      @cdbs.size.to_f
     end
 
     def close

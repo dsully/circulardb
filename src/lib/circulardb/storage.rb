@@ -46,6 +46,11 @@ module CircularDB
       @header[:last_updated]
     end
 
+    # The number of cdbs in a cdb. Aggregate provides a real size.
+    def size
+      1.0
+    end
+
     def validate
       all_dates  = Hash.new
       nil_values = Array.new
