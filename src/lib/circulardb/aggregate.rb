@@ -20,16 +20,18 @@ module CircularDB
       @instance = name
       @cdbs     = []
 
-      if @name =~ /#{EXTENSION}$/
-        @name.sub!(/#{EXTENSION}/, '')
-      end
+      if nil
+        if @name =~ /#{EXTENSION}$/
+          @name.sub!(/#{EXTENSION}/, '')
+        end
 
-      if @instance !~ /^(\/|\.)/
-        @instance.gsub!(/[^\w\d_:\.\/-]/, '_')
-      end
+        if @instance !~ /^(\/|\.)/
+          @instance.gsub!(/[^\w\d_:\.\/-]/, '_')
+        end
 
-      if @instance !~ /#{EXTENSION}$/
-        @instance << EXTENSION
+        if @instance !~ /#{EXTENSION}$/
+          @instance << EXTENSION
+        end
       end
     end
 
@@ -51,14 +53,20 @@ module CircularDB
           end
 
           if cdb.units != @units
+            puts "new: [#{cdb.units}] first: #{@units} - #{cdb.filename}]"
             raise StandardError, "CircularDB units must be the same for aggregation."
           end
         end
 
-        @cdbs = cdbs
+        # Smallest number of records is the driver.
+        @cdbs = cdbs.sort { |a,b| a.num_records <=> b.num_records }.collect { |r| r }
       end
 
       @cdbs
+    end
+
+    def driver_start_time
+      @cdbs[0].read_records(0, 0, -1)[0][0]
     end
 
     def num_records
