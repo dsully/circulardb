@@ -73,7 +73,7 @@ module CircularDB
         end
 
         if name.length > @legend_max
-          name = name[0, ((@legend_max.length - 5 / 2))] << '[...]'
+          name = name[0, (@legend_max - 5 / 2)] << '[...]'
         end
 
         @cdbs[name] = cdb
@@ -134,7 +134,7 @@ module CircularDB
             case size
               when "large"  then plot.terminal "png transparent small size 1060,800"
               when "medium" then plot.terminal "png transparent small size 840,600"
-              else               plot.terminal "png transparent small size 450,250"
+              else               plot.terminal "png transparent small size 550,350"
             end
 
           end
@@ -196,16 +196,6 @@ module CircularDB
             real_start = records.first.first
             real_end   = records.last.first
 
-            # Silence gnuplot warnings.
-            if name =~ /temperature/i
-              min = cdb.aggregate_using_function_for_records("min", @start_time, @end_time)
-              max = cdb.aggregate_using_function_for_records("max", @start_time, @end_time)
-
-              plot.yrange "[-#{min-1.0}:#{max+1.0}]" if min == max
-            else 
-              plot.yrange '[-1:1]' if sum == 0.0
-            end
-
             axis = axes[cdb.units]
 
             unless axis
@@ -217,6 +207,31 @@ module CircularDB
               end
 
               axes[cdb.units] = axis 
+            end
+
+            # Silence gnuplot warnings.
+            if name =~ /temperature/i
+              min = cdb.aggregate_using_function_for_records("min", @start_time, @end_time)
+              max = cdb.aggregate_using_function_for_records("max", @start_time, @end_time)
+
+              if min == max
+                range = "[-#{min-1.0}:#{max+1.0}]"
+
+                if axis == 'x1y1'
+                  plot.yrange range
+                else
+                  plot.y2range range
+                end
+              end
+
+            elsif sum == 0.0
+              range = '[-1:1]'
+              
+              if axis == 'x1y1'
+                plot.yrange range
+              else
+                plot.y2range range
+              end
             end
 
             # Data can be processed on the fly by gnuplot. in the "using 1:2"
