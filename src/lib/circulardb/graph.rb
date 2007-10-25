@@ -263,8 +263,6 @@ module CircularDB
 
             if @show_data or @show_trend
 
-              # Fixup dev names.
-              name.gsub!(/_/, '/')
               div = cdb.size
 
               # Divide by number of cdbs (aggregate) or 1.0 (single).
@@ -274,7 +272,7 @@ module CircularDB
 
               plot.data << Gnuplot::DataSet.new([x, y]) do |ds|
 
-                ds.title = name
+                ds.title = name.gsub(/_/, '/')
                 ds.with  = "#{@style} lw 1.5 lt #{styles[num_plots]}"
 
                 if @show_data and @show_trend == 0

@@ -38,6 +38,7 @@ module CircularDB
     def cdbs=(cdbs) 
 
       if cdbs.length > 0
+
         # Type & Units need to be the same.
         if @type.nil?
           @type = cdbs[0].type
@@ -53,7 +54,6 @@ module CircularDB
           end
 
           if cdb.units != @units
-            puts "new: [#{cdb.units}] first: #{@units} - #{cdb.filename}]"
             raise StandardError, "CircularDB units must be the same for aggregation."
           end
         end
@@ -83,7 +83,14 @@ module CircularDB
     end
 
     def size
-      @cdbs.size.to_f
+
+      # Only aggregate percentage sizes by division, otherwise we want the
+      # total - ie: Network traffic.
+      if @units =~ /transmitted|recieved/
+        return 1.0
+      else
+        return @cdbs.size.to_f
+      end
     end
 
     def close
