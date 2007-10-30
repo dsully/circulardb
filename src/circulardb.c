@@ -286,9 +286,14 @@ int cdb_write_header(cdb_t *cdb) {
         return errno;
     }
 
-    if (fdatasync(cdb->fd) != 0) {
-        return errno;
-    }
+/* OS X doesn't have fdatasync() */
+#ifdef HAVE_FDATASYNC
+    if (fdatasync(cdb->fd) != 0) return errno;
+#endif
+
+#ifdef HAVE_FSYNC
+    if (fsync(cdb->fd) != 0) return errno;
+#endif
 
     cdb->synced = 1;
 
