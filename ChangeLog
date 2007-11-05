@@ -1,3 +1,9 @@
+Version 0.1.6 (dan)
+	* New Makefile.am - PLATFORM-184
+
+Version 0.1.5 (dan)
+	* Move to Makefile.am
+
 Version 0.1.4 (dan)
 	* Fix runtime deps
 

@@ -133,8 +133,8 @@ module CircularDB
 
             case size
               when "large"  then plot.terminal "png transparent small size 1060,800"
-              when "medium" then plot.terminal "png transparent small size 840,600"
-              else               plot.terminal "png transparent small size 550,350"
+              when "medium" then plot.terminal "png transparent small size 780,600"
+              else               plot.terminal "png transparent small size 650,350"
             end
 
           end
@@ -169,12 +169,6 @@ module CircularDB
 
             cdb = @cdbs[name]
 
-            if cdb.num_records == 0
-              puts "No records to plot for: #{cdb.filename}"
-              plots -= 1
-              next
-            end
-
             # Check for empty and bogus values.
             sum = cdb.aggregate_using_function_for_records("sum", @start_time, @end_time)
 
@@ -186,10 +180,10 @@ module CircularDB
 
             records = cdb.read_records(@start_time, @end_time, nil, for_graphing)
 
-            if records.first.nil? or records.last.nil?
-              puts cdb.filename
-              pp records.first
-              pp records.last
+            # 5 is arbitrary
+            if records.first.nil? or records.last.nil? or records.length < 5
+              puts "No records to plot for: #{cdb.filename}"
+              plots -= 1
               next
             end
 
@@ -267,8 +261,16 @@ module CircularDB
 
               # Divide by number of cdbs (aggregate) or 1.0 (single).
               # This should be configurable.
-              x = records.collect { |r| r[0] }
-              y = records.collect { |r| r[1] / div }
+              x = []
+              y = []
+
+              records.each do |r|
+                # Kill bogus peaks
+                next if r[1] > 1.0e10
+
+                x << r[0]
+                y << r[1] / div
+              end
 
               plot.data << Gnuplot::DataSet.new([x, y]) do |ds|
 
@@ -306,9 +308,11 @@ module CircularDB
 
           axes.each_pair do |units,axis|
 
-            # Default plot format - rounds to whole numbers and kilo/mega bytes
+            # Default plot format - rounds to whole numbers and kilo/mega
             if units =~ /bytes per/
               format = "\"%6.0s %cB\""
+            elsif units =~ /bits per/
+              format = "\"%6.0s %cb\""
             else
               format = "\"%6.0s %c\""
             end
@@ -327,11 +331,13 @@ module CircularDB
               plot.format "y #{format}"
               plot.ylabel "\"#{units}\""
               plot.yrange "[0:100]" if units =~ /percent/
+              plot.yrange "[0:*]" if units =~ /bytes|bits/
               ylabel = units
             else
               plot.format "y2 #{format}"
               plot.y2label "\"#{units}\""
               plot.y2range "[0:100]" if units =~ /percent/
+              plot.y2range "[0:*]" if units =~ /bytes|bits/
               plot.y2tics
             end
           end
