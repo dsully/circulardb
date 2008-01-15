@@ -50,11 +50,11 @@ module CircularDB
 
         cdbs.each do |cdb|
           if cdb.type != @type
-            raise StandardError, "CircularDB types must be the same for aggregation."
+            raise StandardError, "CircularDB types must be the same for aggregation: #{cdb.type} != #{@type}\n" + cdb.filename
           end
 
           if cdb.units != @units
-            raise StandardError, "CircularDB units must be the same for aggregation."
+            raise StandardError, "CircularDB units must be the same for aggregation: #{cdb.units} != #{@units}\n" + cdb.filename
           end
         end
 
@@ -67,6 +67,10 @@ module CircularDB
 
     def driver_start_time
       @cdbs[0].read_records(0, 0, -1)[0][0]
+    end
+
+    def driver_end_time
+      @cdbs[0].read_records(0, 0, 0)[-1][0]
     end
 
     def num_records

@@ -51,6 +51,14 @@ module CircularDB
       1.0
     end
 
+    def graph(output = nil, start_time = nil, end_time = nil)
+      cdbg = CircularDB::Graph.new(output, start_time, end_time, self)
+      cdbg.title = self.name
+      cdbg.size  = 'medium'
+      cdbg.graph
+      cdbg.close
+    end
+
     def validate
       all_dates  = Hash.new
       nil_values = Array.new

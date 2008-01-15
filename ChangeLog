@@ -1,3 +1,10 @@
+Version 0.1.7 (dan)
+	* Handle single CircularDB::Storage case when graphing.
+	* Deal with IO or File objects
+	* Add driver_end_time to Aggregate.
+	* Add graph method to CircularDB::Storage.
+	* Additional debugging for Aggregate.
+
 Version 0.1.6 (dan)
 	* New Makefile.am - PLATFORM-184
 

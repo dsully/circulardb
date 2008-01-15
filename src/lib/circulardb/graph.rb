@@ -57,6 +57,11 @@ module CircularDB
 
       @cdbs = Hash.new
 
+      # Handle the singular case. 
+      if cdbs.class == CircularDB::Storage
+        cdbs = [cdbs]
+      end
+
       cdbs.each do |cdb|
 
         name = cdb.name.clone
@@ -83,8 +88,14 @@ module CircularDB
 
     def output=(output)
 
-      if output and File.extname(output) == ".svg"
-        self.type = "svg"
+      if output.class == 'File' or output.class == 'IO'
+        ext = Filename.extname(output.path)
+      elsif output
+        ext = File.extname(output) == ".svg"
+      end
+
+      if ext == ".svg" 
+         self.type = "svg"
       end
 
       @output = output
