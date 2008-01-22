@@ -55,8 +55,9 @@ module CircularDB
       cdbg = CircularDB::Graph.new(output, start_time, end_time, self)
       cdbg.title = self.name
       cdbg.size  = 'medium'
-      cdbg.graph
+      data = cdbg.graph
       cdbg.close
+      data
     end
 
     def validate

@@ -4,6 +4,7 @@ module CircularDB
 
     require 'rubygems'
     require 'fileutils'
+    require 'tempfile'
 
     begin
       require 'gnuplot'
@@ -13,6 +14,8 @@ module CircularDB
     LEGEND_MAX_SIZE = 128
     SMALL_LEGEND_MAX_SIZE = 48
     ONE_HOUR = 60 * 60
+
+    @@gnuplot_fh = nil
 
     # Set the style of the graph. These are gnuplot styles. Possible values are:
     #
@@ -40,6 +43,11 @@ module CircularDB
       self.show_data    = 1
       self.show_trend   = 0
       self.fix_logscale = 0.0000001
+
+      # Keep this around until the program ends.
+      #if @@gnuplot_fh.nil?
+      #  @@gnuplot_fh = IO::popen((Gnuplot.gnuplot(true) or raise 'gnuplot not found'), 'r+')
+      #end
     end
 
     def size=(size)
@@ -88,14 +96,20 @@ module CircularDB
 
     def output=(output)
 
-      if output.class == 'File' or output.class == 'IO'
-        ext = Filename.extname(output.path)
-      elsif output
-        ext = File.extname(output) == ".svg"
-      end
+      if output 
+        if output.respond_to?('path')
+          ext = Filename.extname(output.path)
+        elsif output.class == 'String'
+          ext = File.extname(output) == ".svg"
+        end
 
-      if ext == ".svg" 
-         self.type = "svg"
+        if ext == ".svg" 
+           self.type = "svg"
+        end
+      else
+        # output is nil. because gnuplot is kinda lame, create a temporary file.
+        @tmpfile = Tempfile.new('gnuplot')
+        output   = @tmpfile.path
       end
 
       @output = output
@@ -127,8 +141,8 @@ module CircularDB
       end
 
       # Debug gnuplot scripts with:
-      #File.open("out.gplot", "w") do |gp|
-
+      #File.open("/tmp/out.gplot", "w+") do |gp|
+ 
       Gnuplot.open do |gp|
         Gnuplot::Plot.new(gp) do |plot|
 
@@ -150,15 +164,20 @@ module CircularDB
 
           end
 
-          if @output and @output !~ /^\s*$/
+          if @output
 
-            dirname = File.dirname(@output)
+            if @output.class == 'String' and @output !~ /^\s*$/
+              dirname = File.dirname(@output)
 
-            unless File.exists?(dirname)
-              FileUtils.mkdir_p(dirname)
+              unless File.exists?(dirname)
+                FileUtils.mkdir_p(dirname)
+              end
             end
 
             plot.output @output
+          else
+            # Set output to be empty like gnuplot wants.
+            plot.sets << 'output'
           end
 
           if @logscale
@@ -378,6 +397,14 @@ module CircularDB
 
         end
       end
+
+      if @tmpfile
+        @tmpfile.open
+        graph = @tmpfile.read
+        @tmpfile.close!
+        return graph
+      end
+
     end
 
     def close

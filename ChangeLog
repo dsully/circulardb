@@ -4,6 +4,7 @@ Version 0.1.7 (dan)
 	* Add driver_end_time to Aggregate.
 	* Add graph method to CircularDB::Storage.
 	* Additional debugging for Aggregate.
+	* More tweaks - use tmpfile for sending back return data.
 
 Version 0.1.6 (dan)
 	* New Makefile.am - PLATFORM-184
