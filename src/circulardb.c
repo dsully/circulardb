@@ -30,6 +30,8 @@ static const char svnid[] __attribute__ ((unused)) = "$Id$";
 #include <math.h>  
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_interp.h>
+#include <gsl/gsl_sort.h>
+#include <gsl/gsl_statistics.h>
 
 #include <circulardb_interface.h>
 
@@ -585,11 +587,8 @@ double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time
     double new_value = 0.0;
     double prev_value = 0.0;
     double val_delta = 0.0;
-    double max = 0.0;
-    double min = 0.0;
     double sum = 0.0;
     double ret = 0.0;
-    double values;
     time_t total_time = 0;
     time_t prev_date = 0;
     time_t first_time, last_time;
@@ -604,8 +603,8 @@ double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time
 
     num_recs = cdb_read_records(cdb, start, end, num_requested, cooked, &first_time, &last_time, &records);
 
-    /* DRK would be so nice if you could get an iterator into the database
-       instead of having to copy all the values out */
+    double *values = calloc(num_recs, sizeof(double));
+
     for (i = 0; i < num_recs; i++) {
 
         time_t date  = records[i].time;
@@ -663,30 +662,19 @@ double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time
             continue;
         }
 
-        values += value;
-
-        seen += 1;
-
-        if (!max) max = value; 
-        if (!min) min = value; 
+        values[seen++] = value;
 
         if (!is_counter) {
             sum += value;
         }
-
-        max = value > max ? value : max;
-        min = value < min ? value : min;
     }
-
-    free(records);
 
     if (strcmp(function, "median") == 0) {
 
-        /* TODO - need to find a better way to get median. Not currently used, so no big deal. */
-        /* ret = (values[(seen - 1) / 2] + values[seen / 2]) / 2;  */
-        ret = 0;
+        gsl_sort(values, 1, seen);
+        ret = gsl_stats_median_from_sorted_data(values, 1, seen);
 
-    } else if (strcmp(function, "average") == 0) {
+    } else if ((strcmp(function, "average") == 0) || (strcmp(function, "mean") == 0)) {
 
         if (is_counter) {
 
@@ -697,7 +685,7 @@ double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time
         } else {
 
             if (seen) {
-                ret = sum / seen;
+                ret = gsl_stats_mean(values, 1, seen);
             }
         }
 
@@ -705,16 +693,34 @@ double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time
         ret = sum;
 
     } else if (strcmp(function, "max") == 0) {
-        ret = max;
+        ret = gsl_stats_max(values, 1, seen);
 
     } else if (strcmp(function, "min") == 0) {
-        ret = min;
+        ret = gsl_stats_min(values, 1, seen);
+
+    } else if ((strcmp(function, "stddev") == 0) || (strcmp(function, "sd") == 0)) {
+        ret = gsl_stats_sd(values, 1, seen);
+
+    } else if (strcmp(function, "absdev") == 0) {
+        ret = gsl_stats_absdev(values, 1, seen);
+
+    } else if (strcmp(function, "variance") == 0) {
+        ret = gsl_stats_variance(values, 1, seen);
+
+    } else if (strcmp(function, "skew") == 0) {
+        ret = gsl_stats_skew(values, 1, seen);
+
+    } else if (strcmp(function, "kurtosis") == 0) {
+        ret = gsl_stats_kurtosis(values, 1, seen);
 
     } else {
 
         fprintf(stderr, "aggregate_using_function_for_records() function: [%s] not supported\n", function);
-        return -1;
+        ret = -1;
     }
+
+    free(records);
+    free(values);
 
     return ret;
 }
