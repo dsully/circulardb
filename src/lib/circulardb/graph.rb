@@ -61,6 +61,22 @@ module CircularDB
       @size = size
     end
 
+    # Takes a hash of name => cdb
+    def add_cdbs(cdbs)
+
+      @cdbs ||= Hash.new
+
+      cdbs.each_pair do |name,cdb|
+
+        if cdb.type == "counter"
+          name << " (#{cdb.units})"
+        end
+
+        @cdbs[name] = cdb
+
+      end
+    end
+
     def cdbs=(cdbs)
 
       @cdbs = Hash.new
@@ -294,9 +310,16 @@ module CircularDB
               x = []
               y = []
 
+              #skew   = cdb.aggregate_using_function_for_records("skew", @start_time, @end_time)
+              #median = cdb.aggregate_using_function_for_records("median", @start_time, @end_time)
+              #absdev = cdb.aggregate_using_function_for_records("absdev", @start_time, @end_time)
+        
               records.each do |r|
-                # Kill bogus peaks
-                next if r[1] > 1.0e10
+                # Rudimentary outlier rejection
+                # Zi = 0.6745 * (x - median) / absdev
+                #zi = (0.6745 * (r[1] - median)) / absdev
+                #next if zi > skew
+                #next if r[1] > stddev
 
                 x << r[0]
                 y << r[1] / div
