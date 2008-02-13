@@ -41,7 +41,7 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
 
     cdb_t *cdb;
     VALUE header = rb_hash_new();
-    VALUE filename, flags, mode, name, max_records, num_records, type, units, desc;
+    VALUE filename, flags, mode, name, max_records, num_records, type, units, desc, last_updated;
 
     char *regex = ALLOCA_N(char, 4);
 
@@ -90,12 +90,13 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
             rb_raise(rb_eIOError, strerror(errno));
         }
 
-        name        = rb_str_new2(cdb->header->name);
-        type        = rb_str_new2(cdb->header->type);
-        units       = rb_str_new2(cdb->header->units);
-        desc        = rb_str_new2(cdb->header->description);
-        max_records = ULL2NUM(cdb->header->max_records);
-        num_records = ULL2NUM(cdb->header->num_records);
+        name         = rb_str_new2(cdb->header->name);
+        type         = rb_str_new2(cdb->header->type);
+        units        = rb_str_new2(cdb->header->units);
+        desc         = rb_str_new2(cdb->header->description);
+        max_records  = ULL2NUM(cdb->header->max_records);
+        num_records  = ULL2NUM(cdb->header->num_records);
+        last_updated = INT2FIX(cdb->header->last_updated);
 
     } else {
 
@@ -125,6 +126,10 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
     rb_hash_aset(header, ID2SYM(rb_intern("num_records")), num_records);
     rb_hash_aset(header, ID2SYM(rb_intern("max_records")), max_records);
     rb_hash_aset(header, ID2SYM(rb_intern("description")), desc);
+
+    if (!NIL_P(last_updated)) {
+        rb_hash_aset(header, ID2SYM(rb_intern("last_updated")), last_updated);
+    }
 
     rb_iv_set(self, "@header", header);
 

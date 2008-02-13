@@ -61,8 +61,8 @@ class TestCircularDB < Test::Unit::TestCase
       assert_equal(records[i][1], read[i][1])
     }
 
-    assert_equal(5.5, cdb.aggregate_using_function_for_records("average"))
-    #assert_equal(5.5, cdb.aggregate_using_function_for_records("median"))
+    assert_equal(5.5, cdb.aggregate_using_function_for_records("mean"))
+    assert_equal(5.5, cdb.aggregate_using_function_for_records("median"))
     assert_equal(55, cdb.aggregate_using_function_for_records("sum"))
     assert_equal(10, cdb.aggregate_using_function_for_records("max"))
     assert_equal(1, cdb.aggregate_using_function_for_records("min"))
