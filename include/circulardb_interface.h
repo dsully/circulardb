@@ -56,8 +56,37 @@ typedef struct cdb_s {
     cdb_header_t *header;
 } cdb_t;
 
+/* Hold all the stats for a particular time range, so this computation can be
+ * done only once. */
+typedef struct cdb_range_s {
+    time_t start_time;
+    time_t end_time;
+    uint64_t num_recs;
+    double median, mean, sum, min, max, mad, stddev, absdev, variance, skew, kurtosis;
+    double pct95th, pct75th, pct50th, pct25th;
+} cdb_range_t;
+
+typedef enum cdb_statistics_enum_s {
+    CDB_MEDIAN,
+    CDB_MEAN,
+    CDB_SUM,
+    CDB_MIN,
+    CDB_MAX,
+    CDB_MAD,
+    CDB_STDDEV,
+    CDB_ABSDEV,
+    CDB_VARIANCE,
+    CDB_SKEW,
+    CDB_KURTOSIS,
+    CDB_95TH,
+    CDB_75TH,
+    CDB_50TH,
+    CDB_25TH,
+} cdb_statistics_enum_t;
+
 #define RECORD_SIZE sizeof(cdb_record_t)
 #define HEADER_SIZE sizeof(cdb_header_t)
+#define RANGE_SIZE  sizeof(cdb_range_t)
 
 cdb_t* cdb_new(void);
 void cdb_free(cdb_t *cdb);
@@ -78,10 +107,10 @@ bool cdb_update_record(cdb_t *cdb, time_t time, double value);
 
 uint64_t cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end);
 
-uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested,
-    int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records);
+double cdb_get_statistic(cdb_range_t *range, cdb_statistics_enum_t type);
 
-double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time_t start, time_t end, int64_t num_requested);
+uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested,
+    int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records, cdb_range_t *range);
 
 void cdb_print_header(cdb_t * cdb);
 
@@ -92,13 +121,10 @@ void cdb_print(cdb_t *cdb);
 
 /* Aggregation interface */
 uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
-    int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records);
+    int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records, cdb_range_t *range);
 
 void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
     FILE *fh, const char *date_format, int cooked, time_t *first_time, time_t *last_time);
-
-double cdb_aggregate_for_aggregate(cdb_t **cdbs, int num_cdbs, char *function, time_t start, 
-    time_t end, int64_t num_requested);
 
 /* Bones testing */
 extern int circulardb_run(void);
