@@ -15,7 +15,7 @@ static const char svnid[] __attribute__ ((unused)) = "$Id$";
 #include <fcntl.h>
 #include <float.h>
 #include <inttypes.h>
-#include <regex.h>
+#include <math.h>  
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -27,7 +27,6 @@ static const char svnid[] __attribute__ ((unused)) = "$Id$";
 #include <unistd.h>
 
 /* For the aggretgation interface */
-#include <math.h>  
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_interp.h>
 #include <gsl/gsl_sort.h>
@@ -80,7 +79,9 @@ static uint64_t _physical_record_for_logical_record(cdb_header_t *header, int64_
     }
 
     if (logical_record >= header->num_records) {
-        /* printf("Can't seek to record [%ld] with only [%"PRIu64"] in db\n", logical_record, header->num_records); */
+#ifdef DEBUG
+        printf("Can't seek to record [%ld] with only [%"PRIu64"] in db\n", logical_record, header->num_records);
+#endif
         return 0;
     }
 
@@ -330,12 +331,16 @@ uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
 
     for (i = 0; i < len; i++) {
 
-        /* printf("writing record: [%d] [%f]\n", (int)records[i].time, records[i].value); */
+#ifdef DEBUG
+        printf("writing record: [%d] [%f]\n", (int)records[i].time, records[i].value);
+#endif
 
         off_t offset;
 
         if (records[i].time == 0) {
-            /* printf("write_records: time == 0; skipping!\n"); */
+#ifdef DEBUG
+            printf("write_records: time == 0; skipping!\n");
+#endif
             continue;
         }
 
@@ -356,7 +361,7 @@ uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
         }
 
         if (pwrite(cdb->fd, &records[i], RECORD_SIZE, offset) != RECORD_SIZE) {
-            printf("Couldn't write record [%d] [%s] for: [%s]\n", errno, strerror(errno), cdb->filename);
+            fprintf(stderr, "Couldn't write record [%d] [%s] for: [%s]\n", errno, strerror(errno), cdb->filename);
             break;
         }
 
@@ -398,7 +403,9 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
 
     num_recs = cdb->header->num_records;
 
-    /* printf("in update_records with [%ld] num_recs\n", num_recs); */
+#ifdef DEBUG
+    printf("in update_records with [%ld] num_recs\n", num_recs);
+#endif
 
     for (i = 0; i < len; i++) {
 
@@ -408,7 +415,9 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
         time_t rtime;
         uint64_t lrec;
 
-        /* printf("updating record: [%d] [%.8g]\n", (int)time, value); */
+#ifdef DEBUG
+        printf("updating record: [%d] [%.8g]\n", (int)time, value);
+#endif
 
         lrec = _logical_record_for_time(cdb, time, 0, 0);
 
@@ -430,7 +439,9 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
             rtime = _time_for_logical_record(cdb, lrec);
         }
 
-        /* printf("update_records: lrec [%llu] time [%d] rtime [%d]\n", lrec, time, rtime); */
+#ifdef DEBUG
+        printf("update_records: lrec [%llu] time [%d] rtime [%d]\n", lrec, time, rtime);
+#endif
 
         while (time == rtime && lrec < num_recs - 1) {
 
@@ -442,7 +453,7 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
             _seek_to_logical_record(cdb, lrec);
 
             if (write(cdb->fd, &records[0], RECORD_SIZE) != RECORD_SIZE) {
-                /* printf("update_records: Couldn't write record [%s]\n", strerror(errno)); */
+                fprintf(stderr, "update_records: Couldn't write record [%s]\n", strerror(errno));
                 break;
             }
 
@@ -573,6 +584,8 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
     return factor;
 }
 
+/* Statistics code */
+
 double _find_median(uint64_t num_recs, double *values) {
     gsl_sort(values, 1, num_recs);
     return gsl_stats_median_from_sorted_data(values, 1, num_recs);
@@ -601,6 +614,7 @@ double _find_percentile(uint64_t num_recs, double *values, float percent) {
     return gsl_stats_quantile_from_sorted_data(values, 1, num_recs, percent);
 }
 
+/* Make only one call to reading for a particular time range and compute all our stats */
 void _compute_statistics(cdb_range_t *range, uint64_t num_recs, cdb_record_t *records) {
 
     uint64_t i     = 0;
@@ -689,18 +703,24 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
     }
 
     if (start != 0 && end != 0 && end < start) {
-        /* printf("End [%ld] has to be >= start [%ld] in time interval requested\n", end, start); */
+#ifdef DEBUG
+        printf("End [%ld] has to be >= start [%ld] in time interval requested\n", end, start);
+#endif
         return -1;
     }
 
     if (cdb->header == NULL || cdb->synced != 1) {
-        /* printf("read_records: Nothing to read in [%s]\n", cdb->filename); */
+#ifdef DEBUG
+        printf("read_records: Nothing to read in [%s]\n", cdb->filename);
+#endif
         return -2;
     }
 
     /* bail out if there are no records */
     if (cdb->header->num_records <= 0) {
-        /* printf("read_records: No records!\n"); */
+#ifdef DEBUG
+        printf("read_records: No records!\n");
+#endif
         return 0;
     }
 
@@ -717,11 +737,11 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
         num_requested = -num_requested;
     }
 
-    /*
+#ifdef DEBUG
     printf("read_records start: [%ld]\n", start);
     printf("read_records end: [%ld]\n", end);
     printf("read_records num_requested: [%ld]\n", num_requested);
-    */
+#endif
 
     if (num_requested != 0 && num_requested < 0 && start == 0) {
         /* if reading only few records from the end, just set -ve offset to seek to */
