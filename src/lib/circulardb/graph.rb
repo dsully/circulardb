@@ -69,7 +69,7 @@ module CircularDB
       cdbs.each_pair do |name,cdb|
 
         if cdb.type == "counter"
-          name << " (#{cdb.units})"
+          name = "#{name} (#{cdb.units})"
         end
 
         @cdbs[name] = cdb
@@ -216,9 +216,9 @@ module CircularDB
             cdb = @cdbs[name]
 
             # Check for empty and bogus values.
-            sum = cdb.aggregate_using_function_for_records("sum", @start_time, @end_time)
+            sum = cdb.sum(@start_time, @end_time)
 
-            if sum.nan?
+            if sum.kind_of?(Float) and sum.nan?
               puts "Sum is NaN for: #{cdb.filename}"
               plots -= 1
               next
@@ -251,8 +251,8 @@ module CircularDB
 
             # Silence gnuplot warnings.
             if name =~ /temperature/i
-              min = cdb.aggregate_using_function_for_records("min", @start_time, @end_time)
-              max = cdb.aggregate_using_function_for_records("max", @start_time, @end_time)
+              min = cdb.min(@start_time, @end_time)
+              max = cdb.max(@start_time, @end_time)
 
               if min == max
                 range = "[-#{min-1.0}:#{max+1.0}]"
@@ -310,16 +310,15 @@ module CircularDB
               x = []
               y = []
 
-              #skew   = cdb.aggregate_using_function_for_records("skew", @start_time, @end_time)
-              #median = cdb.aggregate_using_function_for_records("median", @start_time, @end_time)
-              #absdev = cdb.aggregate_using_function_for_records("absdev", @start_time, @end_time)
+              mad    = cdb.mad(@start_time, @end_time)
+              median = cdb.median(@start_time, @end_time)
         
               records.each do |r|
                 # Rudimentary outlier rejection
-                # Zi = 0.6745 * (x - median) / absdev
-                #zi = (0.6745 * (r[1] - median)) / absdev
-                #next if zi > skew
-                #next if r[1] > stddev
+                # Zi = 0.6745 * abs(x - median) / MAD
+                if ((0.6745 * (r[1] - median).abs) / mad) > 3.5
+                  next
+                end
 
                 x << r[0]
                 y << r[1] / div

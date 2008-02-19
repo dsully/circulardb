@@ -52,6 +52,12 @@ class TestAggregateCircularDB < Test::Unit::TestCase
       assert_equal((i+1)*3, read[i][1])
     end
 
+    assert_equal(165, agg.sum)
+    assert_equal(3.0, agg.min)
+    assert_equal(30.0, agg.max)
+    assert_equal(16.5, agg.median)
+    assert_equal(16.5, agg.mean)
+
     agg.close
   end
 

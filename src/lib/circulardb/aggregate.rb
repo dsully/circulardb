@@ -81,11 +81,6 @@ module CircularDB
       @cdbs[0].last_updated
     end
 
-    # Dummy - only used by graph right now. May need to make this real in the future.
-    def aggregate_using_function_for_records(function = nil, start_time = 0, end_time = 0)
-      1.0
-    end
-
     def size
 
       # Only aggregate percentage sizes by division, otherwise we want the

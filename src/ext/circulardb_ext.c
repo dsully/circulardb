@@ -421,14 +421,14 @@ static VALUE cdb_rb_print_records(int argc, VALUE *argv, VALUE self) {
     return array;
 }
 
-static VALUE cdb_rb_aggregate_using_function_for_records(int argc, VALUE *argv, VALUE self) {
+static VALUE _cdb_rb_aggregate_using_function_for_records(int argc, VALUE *argv, VALUE self, char* function) {
 
-    VALUE function, start, end, num_req;
+    VALUE start, end, num_req;
 
     cdb_t *cdb;
     double ret = 0;
 
-    rb_scan_args(argc, argv, "13", &function, &start, &end, &num_req);
+    rb_scan_args(argc, argv, "03", &start, &end, &num_req);
 
     if (NIL_P(start))   start   = INT2FIX(0);
     if (NIL_P(end))     end     = INT2FIX(0);
@@ -437,12 +437,64 @@ static VALUE cdb_rb_aggregate_using_function_for_records(int argc, VALUE *argv, 
     Data_Get_Struct(self, cdb_t, cdb);
 
     ret = cdb_aggregate_using_function_for_records(
-        cdb, StringValuePtr(function), NUM2UINT(start), NUM2UINT(end), rb_num2ull(num_req)
+        cdb, function, NUM2UINT(start), NUM2UINT(end), rb_num2ull(num_req)
     );
 
     return rb_float_new(ret);
 }
 
+/* Helpers that are named a bit nicer */
+static VALUE median(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "median");
+}
+
+static VALUE mad(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "mad");
+}
+
+static VALUE average(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "average");
+}
+
+static VALUE mean(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "mean");
+}
+
+static VALUE sum(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "sum");
+}
+
+static VALUE min(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "min");
+}
+
+static VALUE max(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "max");
+}
+
+static VALUE stddev(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "stddev");
+}
+
+static VALUE absdev(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "absdev");
+}
+
+static VALUE variance(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "variance");
+}
+
+static VALUE skew(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "skew");
+}
+
+static VALUE kurtosis(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "kurtosis");
+}
+
+/****************************************************************************************
+ * Aggregate functions
+ ****************************************************************************************/
 static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
 
     VALUE start, end, num_req, cooked, array;
@@ -557,6 +609,88 @@ static VALUE cdb_agg_rb_print_records(int argc, VALUE *argv, VALUE self) {
     return array;
 }
 
+static VALUE _cdb_rb_aggregate_for_aggregate(int argc, VALUE *argv, VALUE self, char* function) {
+
+    VALUE start, end, num_req;
+    VALUE cdb_objects = rb_iv_get(self, "@cdbs");
+
+    uint64_t i   = 0;
+    uint64_t cnt = 0;
+    double ret   = 0;
+    int num_cdbs = RARRAY(cdb_objects)->len;
+
+    /* initialize the cdbs array to the size of the cdb_objects array */
+    cdb_t *cdbs[num_cdbs];
+
+    rb_scan_args(argc, argv, "03", &start, &end, &num_req);
+
+    if (NIL_P(start))   start   = INT2FIX(0);
+    if (NIL_P(end))     end     = INT2FIX(0);
+    if (NIL_P(num_req)) num_req = INT2FIX(0);
+
+    /* First, loop over the incoming array of CircularDB::Storage objects and
+     * extract the pointers to the cdb_t structs. */
+    for (i = 0; i < num_cdbs; i++) {
+        Data_Get_Struct(RARRAY(cdb_objects)->ptr[i], cdb_t, cdbs[i]);
+    }
+
+    ret = cdb_aggregate_for_aggregate(
+        cdbs, num_cdbs, function, NUM2UINT(start), NUM2UINT(end), rb_num2ull(num_req)
+    );
+
+    return rb_float_new(ret);
+}
+
+static VALUE aggregate_median(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "median");
+}
+
+static VALUE aggregate_mad(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "mad");
+}
+
+static VALUE aggregate_average(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "average");
+}
+
+static VALUE aggregate_mean(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "mean");
+}
+
+static VALUE aggregate_sum(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "sum");
+}
+
+static VALUE aggregate_min(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "min");
+}
+
+static VALUE aggregate_max(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "max");
+}
+
+static VALUE aggregate_stddev(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "stddev");
+}
+
+static VALUE aggregate_absdev(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "absdev");
+}
+
+static VALUE aggregate_variance(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "variance");
+}
+
+static VALUE aggregate_skew(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "skew");
+}
+
+static VALUE aggregate_kurtosis(int argc, VALUE *argv, VALUE self) {
+    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "kurtosis");
+}
+/****************************************************************************************
+ * Ruby Class / Method glue
+ ****************************************************************************************/
 void Init_circulardb_ext() {
 
     mCircularDB = rb_const_get(rb_cObject, rb_intern("CircularDB"));
@@ -579,9 +713,32 @@ void Init_circulardb_ext() {
     rb_define_method(cStorage, "print", cdb_rb_print, 0); 
     rb_define_method(cStorage, "print_header", cdb_rb_print_header, 0); 
     rb_define_method(cStorage, "print_records", cdb_rb_print_records, -1); 
-    rb_define_method(cStorage, "aggregate_using_function_for_records", cdb_rb_aggregate_using_function_for_records, -1); 
+    rb_define_method(cStorage, "median", median, -1); 
+    rb_define_method(cStorage, "mad", mad, -1); 
+    rb_define_method(cStorage, "average", average, -1); 
+    rb_define_method(cStorage, "mean", mean, -1); 
+    rb_define_method(cStorage, "sum", sum, -1); 
+    rb_define_method(cStorage, "min", min, -1); 
+    rb_define_method(cStorage, "max", max, -1); 
+    rb_define_method(cStorage, "stddev", stddev, -1); 
+    rb_define_method(cStorage, "absdev", absdev, -1); 
+    rb_define_method(cStorage, "variance", variance, -1); 
+    rb_define_method(cStorage, "skew", skew, -1); 
+    rb_define_method(cStorage, "kurtosis", kurtosis, -1); 
     rb_define_method(cStorage, "_set_header", _set_header, 2); 
 
     rb_define_method(cAggregate, "read_records", cdb_agg_rb_read_records, -1); 
     rb_define_method(cAggregate, "print_records", cdb_agg_rb_print_records, -1); 
+    rb_define_method(cAggregate, "median", aggregate_median, -1); 
+    rb_define_method(cAggregate, "mad", aggregate_mad, -1); 
+    rb_define_method(cAggregate, "average", aggregate_average, -1); 
+    rb_define_method(cAggregate, "mean", aggregate_mean, -1); 
+    rb_define_method(cAggregate, "sum", aggregate_sum, -1); 
+    rb_define_method(cAggregate, "min", aggregate_min, -1); 
+    rb_define_method(cAggregate, "max", aggregate_max, -1); 
+    rb_define_method(cAggregate, "stddev", aggregate_stddev, -1); 
+    rb_define_method(cAggregate, "absdev", aggregate_absdev, -1); 
+    rb_define_method(cAggregate, "variance", aggregate_variance, -1); 
+    rb_define_method(cAggregate, "skew", aggregate_skew, -1); 
+    rb_define_method(cAggregate, "kurtosis", aggregate_kurtosis, -1); 
 }
