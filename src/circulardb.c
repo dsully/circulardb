@@ -178,6 +178,7 @@ static int64_t _logical_record_for_time(cdb_t *cdb, time_t req_time, int64_t sta
         return start_logical_record;
     }
 
+    /* don't go out of bounds */ 
     if (start_logical_record + 1 >= num_recs) {
         return start_logical_record;
     }
@@ -185,9 +186,8 @@ static int64_t _logical_record_for_time(cdb_t *cdb, time_t req_time, int64_t sta
     next_logical_record = start_logical_record;
     next_time = start_time;
 
-    /* if readLogicalRecord encounters bad data it fabricates and
+    /* if _seek_to_logical_record encounters bad data it fabricates and
        returns next good value. Try to get the *real* next rec. */
-
     while ((next_time - start_time) == 0) {
 
         next_logical_record += 1;
@@ -201,7 +201,7 @@ static int64_t _logical_record_for_time(cdb_t *cdb, time_t req_time, int64_t sta
 
     delta = next_time - start_time;
 
-    /* delta = 0 means that readLogicalRecord fabricated data on the fly */
+    /* delta = 0 means that _seek_to_logical_record fabricated data on the fly */
     if (delta == 0) {
         return start_logical_record;
     /* if we have wrapped over, or if the requested time is in the range of start and next, return start */
@@ -214,9 +214,7 @@ static int64_t _logical_record_for_time(cdb_t *cdb, time_t req_time, int64_t sta
     /* for the very first binary search pivot point, take an aggressive guess to make search converge faster */
     if (first_time) {
         center_logical_record = (req_time - start_time) / (next_time - start_time) - 1;
-
     } else {
-
         center_logical_record = start_logical_record + (end_logical_record - start_logical_record) / 2;
     }
 
@@ -288,13 +286,13 @@ int cdb_write_header(cdb_t *cdb) {
         return errno;
     }
 
-/* OS X doesn't have fdatasync() */
+    /* OS X doesn't have fdatasync() */
 #ifdef HAVE_FDATASYNC
     if (fdatasync(cdb->fd) != 0) return errno;
-#endif
-
+#else
 #ifdef HAVE_FSYNC
     if (fsync(cdb->fd) != 0) return errno;
+#endif
 #endif
 
     cdb->synced = 1;
@@ -575,143 +573,99 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
     return factor;
 }
 
-double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time_t start, time_t end, int64_t num_requested) {
+double _find_median(uint64_t num_recs, double *values) {
+    gsl_sort(values, 1, num_recs);
+    return gsl_stats_median_from_sorted_data(values, 1, num_recs);
+}
 
-    int factor = 0;
-    int time_delta = 0;
-    int is_counter = 0;
-    int cooked = 0;
+
+double _find_percentile(uint64_t num_recs, double *values, float percent) {
+    gsl_sort(values, 1, num_recs);
+    return gsl_stats_quantile_from_sorted_data(values, 1, num_recs, percent);
+}
+
+double _compute_aggregate(char *function, uint64_t num_recs, cdb_record_t *records) {
+
     uint64_t i = 0;
-    uint64_t num_recs = 0;
-    uint64_t seen = 0;
-    double new_value = 0.0;
-    double prev_value = 0.0;
-    double val_delta = 0.0;
     double sum = 0.0;
     double ret = 0.0;
-    time_t total_time = 0;
-    time_t prev_date = 0;
-    time_t first_time, last_time;
 
-    cdb_record_t *records = NULL;
-
-    if (strcmp(cdb->header->type, "counter") == 0) {
-        is_counter = 1;
+    if (num_recs == 0.0) {
+        free(records);
+        return 0.0;
     }
-
-    factor = _compute_scale_factor_and_num_records(cdb, &num_requested);
-
-    num_recs = cdb_read_records(cdb, start, end, num_requested, cooked, &first_time, &last_time, &records);
 
     double *values = calloc(num_recs, sizeof(double));
 
     for (i = 0; i < num_recs; i++) {
 
-        time_t date  = records[i].time;
-        double value = records[i].value;
-
-        if (!date || date < 0) {
-            continue;
-        }
-
-        if (value == DBL_MAX) {
-            value = DBL_MIN;
-        }
-
-        if (is_counter) {
-
-            new_value = value;
-            value = DBL_MAX;
-
-            if (prev_value != DBL_MAX && new_value != DBL_MAX) {
-
-                val_delta = new_value - prev_value;
-
-                if (val_delta >= 0) {
-                    value = val_delta;
-                }
-            }
-
-            if (value != DBL_MAX) {
-                sum += value;
-            }
-
-            prev_value = new_value;
-        }
-
-        if (factor) {
-
-            if (prev_date == 0) {
-                prev_date = date;
-                continue;
-            }
-
-            time_delta = date - prev_date;
-
-            if (time_delta > 0 && value != DBL_MAX) {
-
-                value = factor * (value / time_delta);
-
-                total_time += time_delta;
-            }
-
-            prev_date = date;
-        }
-
-        if (value == DBL_MAX) {
-            continue;
-        }
-
-        values[seen++] = value;
-
-        if (!is_counter) {
-            sum += value;
-        }
+        values[i] = records[i].value;
+        sum      += values[i];
     }
 
     if (strcmp(function, "median") == 0) {
 
-        gsl_sort(values, 1, seen);
-        ret = gsl_stats_median_from_sorted_data(values, 1, seen);
+        ret = _find_median(num_recs, values);
+
+    } else if (strcmp(function, "mad") == 0) {
+
+        double median = _find_median(num_recs, values);
+
+        /* Values is now sorted */
+        /* http://en.wikipedia.org/wiki/Median_absolute_deviation */
+        for (i = 0; i < num_recs; i++) {
+            values[i] = fabs(values[i] - median);
+
+            if (values[i] < 0.0) {
+                values[i] *= -1.0;
+            }
+        }
+
+        ret = _find_median(num_recs, values);
+
+    } else if (strcmp(function, "95th") == 0) {
+
+        ret = _find_percentile(num_recs, values, 0.95);
+
+    } else if (strcmp(function, "75th") == 0) {
+
+        ret = _find_percentile(num_recs, values, 0.75);
+
+    } else if (strcmp(function, "50th") == 0) {
+
+        ret = _find_percentile(num_recs, values, 0.50);
+
+    } else if (strcmp(function, "25th") == 0) {
+
+        ret = _find_percentile(num_recs, values, 0.25);
 
     } else if ((strcmp(function, "average") == 0) || (strcmp(function, "mean") == 0)) {
 
-        if (is_counter) {
-
-            if (total_time) {
-                ret = sum / total_time;
-            }
-
-        } else {
-
-            if (seen) {
-                ret = gsl_stats_mean(values, 1, seen);
-            }
-        }
+        ret = gsl_stats_mean(values, 1, num_recs);
 
     } else if (strcmp(function, "sum") == 0) {
         ret = sum;
 
     } else if (strcmp(function, "max") == 0) {
-        ret = gsl_stats_max(values, 1, seen);
+        ret = gsl_stats_max(values, 1, num_recs);
 
     } else if (strcmp(function, "min") == 0) {
-        ret = gsl_stats_min(values, 1, seen);
+        ret = gsl_stats_min(values, 1, num_recs);
 
     } else if ((strcmp(function, "stddev") == 0) || (strcmp(function, "sd") == 0)) {
-        ret = gsl_stats_sd(values, 1, seen);
+        ret = gsl_stats_sd(values, 1, num_recs);
 
     } else if (strcmp(function, "absdev") == 0) {
-        ret = gsl_stats_absdev(values, 1, seen);
+        ret = gsl_stats_absdev(values, 1, num_recs);
 
     } else if (strcmp(function, "variance") == 0) {
-        ret = gsl_stats_variance(values, 1, seen);
+        ret = gsl_stats_variance(values, 1, num_recs);
 
     } else if (strcmp(function, "skew") == 0) {
-        ret = gsl_stats_skew(values, 1, seen);
+        ret = gsl_stats_skew(values, 1, num_recs);
 
     } else if (strcmp(function, "kurtosis") == 0) {
-        ret = gsl_stats_kurtosis(values, 1, seen);
+        ret = gsl_stats_kurtosis(values, 1, num_recs);
 
     } else {
 
@@ -723,6 +677,19 @@ double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time
     free(values);
 
     return ret;
+}
+
+double cdb_aggregate_using_function_for_records(cdb_t *cdb, char *function, time_t start, time_t end, int64_t num_requested) {
+
+    int cooked = 1;
+    uint64_t num_recs = 0;
+    time_t first_time, last_time;
+
+    cdb_record_t *records = NULL;
+
+    num_recs = cdb_read_records(cdb, start, end, num_requested, cooked, &first_time, &last_time, &records);
+
+    return _compute_aggregate(function, num_recs, records);
 }
 
 uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, 
@@ -1096,6 +1063,20 @@ void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_
     }
 
     free(records);
+}
+
+/* Compute median, average, etc over the aggregate data of many cdbs */ 
+double cdb_aggregate_for_aggregate(cdb_t **cdbs, int num_cdbs, char *function, time_t start, time_t end, int64_t num_requested) {
+
+    int cooked = 1;
+    uint64_t num_recs = 0;
+    time_t first_time, last_time;
+
+    cdb_record_t *records = NULL;
+
+    num_recs = cdb_read_aggregate_records(cdbs, num_cdbs, start, end, num_requested, cooked, &first_time, &last_time, &records);
+
+    return _compute_aggregate(function, num_recs, records);
 }
 
 void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, char* type, char* units, char* description) {

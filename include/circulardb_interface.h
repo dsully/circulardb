@@ -97,6 +97,9 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
 void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
     FILE *fh, const char *date_format, int cooked, time_t *first_time, time_t *last_time);
 
+double cdb_aggregate_for_aggregate(cdb_t **cdbs, int num_cdbs, char *function, time_t start, 
+    time_t end, int64_t num_requested);
+
 /* Bones testing */
 extern int circulardb_run(void);
 
