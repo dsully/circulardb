@@ -215,8 +215,13 @@ module CircularDB
 
             cdb = @cdbs[name]
 
+            records    = cdb.read_records(@start_time, @end_time, nil, for_graphing)
+            real_start = records.first.first
+            real_end   = records.last.first
+            stats      = cdb.statistics
+
             # Check for empty and bogus values.
-            sum = cdb.sum(@start_time, @end_time)
+            sum = stats.sum
 
             if sum.kind_of?(Float) and sum.nan?
               puts "Sum is NaN for: #{cdb.filename}"
@@ -224,17 +229,12 @@ module CircularDB
               next
             end
 
-            records = cdb.read_records(@start_time, @end_time, nil, for_graphing)
-
             # 5 is arbitrary
             if records.first.nil? or records.last.nil? or records.length < 5
               puts "No records to plot for: #{cdb.filename}"
               plots -= 1
               next
             end
-
-            real_start = records.first.first
-            real_end   = records.last.first
 
             axis = axes[cdb.units]
 
@@ -251,8 +251,8 @@ module CircularDB
 
             # Silence gnuplot warnings.
             if name =~ /temperature/i
-              min = cdb.min(@start_time, @end_time)
-              max = cdb.max(@start_time, @end_time)
+              min = stats.min
+              max = stats.max
 
               if min == max
                 range = "[-#{min-1.0}:#{max+1.0}]"
@@ -264,8 +264,8 @@ module CircularDB
                 end
               end
 
-            elsif sum == 0.0
-              range = '[-1:1]'
+            elsif sum < 1
+              range = '[0:1]'
               
               if axis == 'x1y1'
                 plot.yrange range
@@ -310,8 +310,8 @@ module CircularDB
               x = []
               y = []
 
-              mad    = cdb.mad(@start_time, @end_time)
-              median = cdb.median(@start_time, @end_time)
+              mad    = stats.mad
+              median = stats.median
         
               records.each do |r|
                 # Rudimentary outlier rejection
