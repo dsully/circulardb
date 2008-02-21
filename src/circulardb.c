@@ -584,37 +584,9 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
     return factor;
 }
 
-/* Statistics code */
-
-double _find_median(uint64_t num_recs, double *values) {
-    gsl_sort(values, 1, num_recs);
-    return gsl_stats_median_from_sorted_data(values, 1, num_recs);
-}
-
-double _find_mad(uint64_t num_recs, double *values) {
-
-    double median = _find_median(num_recs, values);
-    uint64_t i    = 0;
-
-    /* Values is now sorted */
-    /* http://en.wikipedia.org/wiki/Median_absolute_deviation */
-    for (i = 0; i < num_recs; i++) {
-        values[i] = fabs(values[i] - median);
-
-        if (values[i] < 0.0) {
-            values[i] *= -1.0;
-        }
-    }
-
-    return _find_median(num_recs, values);
-}
-
-double _find_percentile(uint64_t num_recs, double *values, float percent) {
-    gsl_sort(values, 1, num_recs);
-    return gsl_stats_quantile_from_sorted_data(values, 1, num_recs, percent);
-}
-
-/* Make only one call to reading for a particular time range and compute all our stats */
+/* Statistics code
+ * Make only one call to reading for a particular time range and compute all our stats
+ */
 void _compute_statistics(cdb_range_t *range, uint64_t num_recs, cdb_record_t *records) {
 
     uint64_t i     = 0;
@@ -627,8 +599,7 @@ void _compute_statistics(cdb_range_t *range, uint64_t num_recs, cdb_record_t *re
         sum      += values[i];
     }
 
-    range->median   = _find_median(num_recs, values);
-    range->mad      = _find_mad(num_recs, values);
+    range->num_recs = num_recs;
     range->mean     = gsl_stats_mean(values, 1, num_recs);
     range->max      = gsl_stats_max(values, 1, num_recs);
     range->min      = gsl_stats_min(values, 1, num_recs);
@@ -638,11 +609,29 @@ void _compute_statistics(cdb_range_t *range, uint64_t num_recs, cdb_record_t *re
     range->variance = gsl_stats_variance(values, 1, num_recs);
     range->skew     = gsl_stats_skew(values, 1, num_recs);
     range->kurtosis = gsl_stats_kurtosis(values, 1, num_recs);
-    range->pct95th  = _find_percentile(num_recs, values, 0.95);
-    range->pct75th  = _find_percentile(num_recs, values, 0.75);
-    range->pct50th  = _find_percentile(num_recs, values, 0.50);
-    range->pct25th  = _find_percentile(num_recs, values, 0.25);
-    range->num_recs = num_recs;
+
+    /* The rest need sorted data */
+    gsl_sort(values, 1, num_recs);
+
+    range->median   = gsl_stats_median_from_sorted_data(values, 1, num_recs);
+    range->pct95th  = gsl_stats_quantile_from_sorted_data(values, 1, num_recs, 0.95);
+    range->pct75th  = gsl_stats_quantile_from_sorted_data(values, 1, num_recs, 0.75);
+    range->pct50th  = gsl_stats_quantile_from_sorted_data(values, 1, num_recs, 0.50);
+    range->pct25th  = gsl_stats_quantile_from_sorted_data(values, 1, num_recs, 0.25);
+
+    /* MAD must come last because it alters the values array
+     * http://en.wikipedia.org/wiki/Median_absolute_deviation */
+    for (i = 0; i < num_recs; i++) {
+        values[i] = fabs(values[i] - range->median);
+
+        if (values[i] < 0.0) {
+            values[i] *= -1.0;
+        }
+    }
+
+    /* Final sort is required MAD */
+    gsl_sort(values, 1, num_recs);
+    range->mad = gsl_stats_median_from_sorted_data(values, 1, num_recs);
 
     free(values);
 }
