@@ -61,11 +61,11 @@ class TestCircularDB < Test::Unit::TestCase
       assert_equal(records[i][1], read[i][1])
     }
 
-    assert_equal(5.5, cdb.mean)
-    assert_equal(5.5, cdb.median)
-    assert_equal(55, cdb.sum)
-    assert_equal(10, cdb.max)
-    assert_equal(1, cdb.min)
+    assert_equal(5.5, cdb.statistics.mean)
+    assert_equal(5.5, cdb.statistics.median)
+    assert_equal(55, cdb.statistics.sum)
+    assert_equal(10, cdb.statistics.max)
+    assert_equal(1, cdb.statistics.min)
 
     # Check setting a float and reading it back.
     assert_equal(1, cdb.update_record(records[5][0], 999.0005))

@@ -14,6 +14,13 @@
 static VALUE mCircularDB;
 static VALUE cStorage;
 static VALUE cAggregate;
+static VALUE cStatistics;
+
+void print_class(char* token, VALUE obj) {
+    VALUE class = rb_any_to_s(obj);
+
+    fprintf(stderr, "token: [%s] id: [%s]\n", token, StringValuePtr(class));
+}
 
 /* Cleanup after an object has been GCed */
 static void cdb_rb_free(void *p) {
@@ -28,6 +35,43 @@ static VALUE cdb_rb_alloc(VALUE klass) {
 
     return obj;
 } 
+
+/* Allocator/Dealloc for CircularDB::Statistics */
+static void cdb_statistics_rb_free(void *p) {
+    if (p != NULL) {
+        free(p);
+        p = NULL;
+    }
+}
+
+static VALUE cdb_statistics_rb_alloc(VALUE klass) { 
+
+    cdb_range_t *range = calloc(1, sizeof(cdb_range_t));
+
+    VALUE obj = Data_Wrap_Struct(klass, 0, cdb_statistics_rb_free, range);
+
+    return obj;
+}
+
+cdb_range_t* _new_statistics(VALUE self) {
+    cdb_range_t *range;
+
+    /* Store the range statistics as an ivar. This overwrites any previous
+     * value. Statistics are good only for the last read. */
+    VALUE statistics = rb_iv_get(self, "@statistics");
+
+    if (statistics == Qnil) {
+        statistics = rb_class_new_instance(0, 0, cStatistics);
+        rb_iv_set(self, "@statistics", statistics);
+    }
+
+    /* range now points into the object */
+    Data_Get_Struct(statistics, cdb_range_t, range);
+
+    MEMZERO(range, cdb_range_t, 1);
+
+    return range;
+}
 
 void _cdb_rb_update_header_hash(VALUE self, cdb_t *cdb) {
 
@@ -132,6 +176,7 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
     }
 
     rb_iv_set(self, "@header", header);
+    rb_iv_set(self, "@statistics", Qnil);
 
     return self;
 }
@@ -168,6 +213,7 @@ static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
     time_t first_time, last_time;
 
     cdb_t *cdb;
+    cdb_range_t *range    = _new_statistics(self);
     cdb_record_t *records = NULL;
 
     rb_scan_args(argc, argv, "04", &start, &end, &num_req, &cooked);
@@ -186,7 +232,8 @@ static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
         cooked,
         &first_time,
         &last_time,
-        &records
+        &records,
+        range
     );
 
     switch (cnt) {
@@ -201,7 +248,6 @@ static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
         VALUE entry = rb_ary_new2(2);
 
         rb_ary_store(entry, 0, ULONG2NUM(records[i].time));
-        //rb_ary_store(entry, 1, rb_dbl2big(records[i].value));
         
         if (records[i].value == DBL_MIN) {
             rb_ary_store(entry, 1, Qnil);
@@ -421,80 +467,30 @@ static VALUE cdb_rb_print_records(int argc, VALUE *argv, VALUE self) {
     return array;
 }
 
-static VALUE _cdb_rb_aggregate_using_function_for_records(int argc, VALUE *argv, VALUE self, char* function) {
+static VALUE cdb_rb_statistics(int argc, VALUE *argv, VALUE self) {
+    VALUE statistics = rb_iv_get(self, "@statistics");
 
-    VALUE start, end, num_req;
+    /* Do a read of the full range to populate */
+    if (statistics == Qnil) {
+        cdb_rb_read_records(argc, argv, self);
+        statistics = rb_iv_get(self, "@statistics");
+    }
 
-    cdb_t *cdb;
-    double ret = 0;
-
-    rb_scan_args(argc, argv, "03", &start, &end, &num_req);
-
-    if (NIL_P(start))   start   = INT2FIX(0);
-    if (NIL_P(end))     end     = INT2FIX(0);
-    if (NIL_P(num_req)) num_req = INT2FIX(0);
-
-    Data_Get_Struct(self, cdb_t, cdb);
-
-    ret = cdb_aggregate_using_function_for_records(
-        cdb, function, NUM2UINT(start), NUM2UINT(end), rb_num2ull(num_req)
-    );
-
-    return rb_float_new(ret);
-}
-
-/* Helpers that are named a bit nicer */
-static VALUE median(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "median");
-}
-
-static VALUE mad(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "mad");
-}
-
-static VALUE average(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "average");
-}
-
-static VALUE mean(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "mean");
-}
-
-static VALUE sum(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "sum");
-}
-
-static VALUE min(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "min");
-}
-
-static VALUE max(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "max");
-}
-
-static VALUE stddev(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "stddev");
-}
-
-static VALUE absdev(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "absdev");
-}
-
-static VALUE variance(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "variance");
-}
-
-static VALUE skew(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "skew");
-}
-
-static VALUE kurtosis(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_using_function_for_records(argc, argv, self, "kurtosis");
+    return statistics;
 }
 
 /****************************************************************************************
  * Aggregate functions
  ****************************************************************************************/
+static VALUE cdb_agg_rb_initialize(VALUE self, VALUE name) {
+
+    rb_iv_set(self, "@name", name);
+    rb_iv_set(self, "@cdbs", rb_ary_new());
+    rb_iv_set(self, "@statistics", Qnil);
+
+    return self;
+}
+
 static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
 
     VALUE start, end, num_req, cooked, array;
@@ -507,6 +503,7 @@ static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
     /* initialize the cdbs array to the size of the cdb_objects array */
     cdb_t *cdbs[num_cdbs];
     cdb_record_t *records = NULL;
+    cdb_range_t *range    = _new_statistics(self);
     time_t first_time, last_time;
 
     rb_scan_args(argc, argv, "04", &start, &end, &num_req, &cooked);
@@ -531,7 +528,8 @@ static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
         NUM2UINT(cooked),
         &first_time,
         &last_time,
-        &records
+        &records,
+        range
     );
 
     array = rb_ary_new2(cnt);
@@ -609,85 +607,93 @@ static VALUE cdb_agg_rb_print_records(int argc, VALUE *argv, VALUE self) {
     return array;
 }
 
-static VALUE _cdb_rb_aggregate_for_aggregate(int argc, VALUE *argv, VALUE self, char* function) {
+static VALUE cdb_agg_rb_statistics(int argc, VALUE *argv, VALUE self) {
+    VALUE statistics = rb_iv_get(self, "@statistics");
 
-    VALUE start, end, num_req;
-    VALUE cdb_objects = rb_iv_get(self, "@cdbs");
-
-    uint64_t i   = 0;
-    uint64_t cnt = 0;
-    double ret   = 0;
-    int num_cdbs = RARRAY(cdb_objects)->len;
-
-    /* initialize the cdbs array to the size of the cdb_objects array */
-    cdb_t *cdbs[num_cdbs];
-
-    rb_scan_args(argc, argv, "03", &start, &end, &num_req);
-
-    if (NIL_P(start))   start   = INT2FIX(0);
-    if (NIL_P(end))     end     = INT2FIX(0);
-    if (NIL_P(num_req)) num_req = INT2FIX(0);
-
-    /* First, loop over the incoming array of CircularDB::Storage objects and
-     * extract the pointers to the cdb_t structs. */
-    for (i = 0; i < num_cdbs; i++) {
-        Data_Get_Struct(RARRAY(cdb_objects)->ptr[i], cdb_t, cdbs[i]);
+    /* Do a read of the full range to populate */
+    if (statistics == Qnil) {
+        cdb_agg_rb_read_records(argc, argv, self);
+        statistics = rb_iv_get(self, "@statistics");
     }
 
-    ret = cdb_aggregate_for_aggregate(
-        cdbs, num_cdbs, function, NUM2UINT(start), NUM2UINT(end), rb_num2ull(num_req)
-    );
-
-    return rb_float_new(ret);
+    return statistics;
 }
 
-static VALUE aggregate_median(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "median");
+/****************************************************************************************
+ * Statistics functions
+ ****************************************************************************************/
+static VALUE _cdb_rb_get_statistics(VALUE self, cdb_statistics_enum_t type) {
+    cdb_range_t *range;
+
+    Data_Get_Struct(self, cdb_range_t, range);
+
+    return rb_float_new(cdb_get_statistic(range, type));
 }
 
-static VALUE aggregate_mad(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "mad");
+static VALUE statistics_median(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_MEDIAN);
 }
 
-static VALUE aggregate_average(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "average");
+static VALUE statistics_mad(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_MAD);
 }
 
-static VALUE aggregate_mean(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "mean");
+static VALUE statistics_average(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_MEAN);
 }
 
-static VALUE aggregate_sum(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "sum");
+static VALUE statistics_mean(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_MEAN);
 }
 
-static VALUE aggregate_min(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "min");
+static VALUE statistics_sum(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_SUM);
 }
 
-static VALUE aggregate_max(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "max");
+static VALUE statistics_min(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_MIN);
 }
 
-static VALUE aggregate_stddev(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "stddev");
+static VALUE statistics_max(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_MAX);
 }
 
-static VALUE aggregate_absdev(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "absdev");
+static VALUE statistics_stddev(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_STDDEV);
 }
 
-static VALUE aggregate_variance(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "variance");
+static VALUE statistics_absdev(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_ABSDEV);
 }
 
-static VALUE aggregate_skew(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "skew");
+static VALUE statistics_variance(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_VARIANCE);
 }
 
-static VALUE aggregate_kurtosis(int argc, VALUE *argv, VALUE self) {
-    return _cdb_rb_aggregate_for_aggregate(argc, argv, self, "kurtosis");
+static VALUE statistics_skew(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_SKEW);
 }
+
+static VALUE statistics_kurtosis(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_KURTOSIS);
+}
+
+static VALUE statistics_95th(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_95TH);
+}
+
+static VALUE statistics_75th(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_75TH);
+}
+
+static VALUE statistics_50th(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_50TH);
+}
+
+static VALUE statistics_25th(VALUE self) {
+    return _cdb_rb_get_statistics(self, CDB_25TH);
+}
+
 /****************************************************************************************
  * Ruby Class / Method glue
  ****************************************************************************************/
@@ -696,9 +702,9 @@ void Init_circulardb_ext() {
     mCircularDB = rb_const_get(rb_cObject, rb_intern("CircularDB"));
     cStorage    = rb_define_class_under(mCircularDB, "Storage", rb_cObject);
     cAggregate  = rb_define_class_under(mCircularDB, "Aggregate", rb_cObject);
+    cStatistics = rb_define_class_under(mCircularDB, "Statistics", rb_cObject);
 
     rb_define_alloc_func(cStorage, cdb_rb_alloc);
-
     rb_define_method(cStorage, "initialize", cdb_rb_initialize, -1); 
     rb_define_method(cStorage, "open", cdb_rb_open_cdb, 0); 
     rb_define_method(cStorage, "close", cdb_rb_close_cdb, 0); 
@@ -713,32 +719,29 @@ void Init_circulardb_ext() {
     rb_define_method(cStorage, "print", cdb_rb_print, 0); 
     rb_define_method(cStorage, "print_header", cdb_rb_print_header, 0); 
     rb_define_method(cStorage, "print_records", cdb_rb_print_records, -1); 
-    rb_define_method(cStorage, "median", median, -1); 
-    rb_define_method(cStorage, "mad", mad, -1); 
-    rb_define_method(cStorage, "average", average, -1); 
-    rb_define_method(cStorage, "mean", mean, -1); 
-    rb_define_method(cStorage, "sum", sum, -1); 
-    rb_define_method(cStorage, "min", min, -1); 
-    rb_define_method(cStorage, "max", max, -1); 
-    rb_define_method(cStorage, "stddev", stddev, -1); 
-    rb_define_method(cStorage, "absdev", absdev, -1); 
-    rb_define_method(cStorage, "variance", variance, -1); 
-    rb_define_method(cStorage, "skew", skew, -1); 
-    rb_define_method(cStorage, "kurtosis", kurtosis, -1); 
     rb_define_method(cStorage, "_set_header", _set_header, 2); 
+    rb_define_method(cStorage, "statistics", cdb_rb_statistics, -1); 
 
+    rb_define_method(cAggregate, "initialize", cdb_agg_rb_initialize, 1); 
     rb_define_method(cAggregate, "read_records", cdb_agg_rb_read_records, -1); 
     rb_define_method(cAggregate, "print_records", cdb_agg_rb_print_records, -1); 
-    rb_define_method(cAggregate, "median", aggregate_median, -1); 
-    rb_define_method(cAggregate, "mad", aggregate_mad, -1); 
-    rb_define_method(cAggregate, "average", aggregate_average, -1); 
-    rb_define_method(cAggregate, "mean", aggregate_mean, -1); 
-    rb_define_method(cAggregate, "sum", aggregate_sum, -1); 
-    rb_define_method(cAggregate, "min", aggregate_min, -1); 
-    rb_define_method(cAggregate, "max", aggregate_max, -1); 
-    rb_define_method(cAggregate, "stddev", aggregate_stddev, -1); 
-    rb_define_method(cAggregate, "absdev", aggregate_absdev, -1); 
-    rb_define_method(cAggregate, "variance", aggregate_variance, -1); 
-    rb_define_method(cAggregate, "skew", aggregate_skew, -1); 
-    rb_define_method(cAggregate, "kurtosis", aggregate_kurtosis, -1); 
+    rb_define_method(cAggregate, "statistics", cdb_agg_rb_statistics, -1); 
+
+    rb_define_alloc_func(cStatistics, cdb_statistics_rb_alloc);
+    rb_define_method(cStatistics, "median", statistics_median, 0); 
+    rb_define_method(cStatistics, "mad", statistics_mad, 0); 
+    rb_define_method(cStatistics, "average", statistics_average, 0); 
+    rb_define_method(cStatistics, "mean", statistics_mean, 0); 
+    rb_define_method(cStatistics, "sum", statistics_sum, 0); 
+    rb_define_method(cStatistics, "min", statistics_min, 0); 
+    rb_define_method(cStatistics, "max", statistics_max, 0); 
+    rb_define_method(cStatistics, "stddev", statistics_stddev, 0); 
+    rb_define_method(cStatistics, "absdev", statistics_absdev, 0); 
+    rb_define_method(cStatistics, "variance", statistics_variance, 0); 
+    rb_define_method(cStatistics, "skew", statistics_skew, 0); 
+    rb_define_method(cStatistics, "kurtosis", statistics_kurtosis, 0); 
+    rb_define_method(cStatistics, "pct95th", statistics_95th, 0); 
+    rb_define_method(cStatistics, "pct75th", statistics_75th, 0); 
+    rb_define_method(cStatistics, "pct50th", statistics_50th, 0); 
+    rb_define_method(cStatistics, "pct25th", statistics_25th, 0); 
 }

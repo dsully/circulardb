@@ -14,27 +14,6 @@ module CircularDB
 
     attr_reader :cdbs, :name, :type, :units
 
-    def initialize(name)
-
-      @name     = name
-      @instance = name
-      @cdbs     = []
-
-      if nil
-        if @name =~ /#{EXTENSION}$/
-          @name.sub!(/#{EXTENSION}/, '')
-        end
-
-        if @instance !~ /^(\/|\.)/
-          @instance.gsub!(/[^\w\d_:\.\/-]/, '_')
-        end
-
-        if @instance !~ /#{EXTENSION}$/
-          @instance << EXTENSION
-        end
-      end
-    end
-
     def cdbs=(cdbs) 
 
       if cdbs.length > 0
