@@ -60,11 +60,11 @@ module CircularDB
       data
     end
 
-    def validate
+    def validate(verbose = false)
       all_dates  = Hash.new
       nil_values = Array.new
       duplicates = Array.new
-      wraps      = Array.new
+      wraps      = Hash.new
       bad_dates  = Array.new
 
       prev_date  = -1;
@@ -74,6 +74,7 @@ module CircularDB
         puts "No records!"
       end
 
+      # XXX - why isn't this setting cooked properly
       records = self.read_records
 
       records.each { |entry|
@@ -90,9 +91,9 @@ module CircularDB
           nil_values.push(date)
         end
 
-        if type == "counter" and value < prev_value
-          wraps.push(date)
-        end
+        #if type == "counter" and value < prev_value
+        #  wraps[date] = "#{value} < #{prev_value}"
+        #end
 
         if date < prev_date
           bad_dates.push(date)
@@ -102,40 +103,42 @@ module CircularDB
         prev_value = value
       }
 
-      self.print_header
-
-      ret = false
-
-      if bad_dates.empty?
-        puts "There are no out of order timestamps in this DB"
-      else
-        puts "Error: DB has #{bad_dates.size} record(s) with out of order timestamps"
-        bad_dates.each { |date| puts date }
-        ret = true
+      if verbose
+        #self.print_header
       end
 
-      if duplicates.empty?
-        puts "There are no duplicate timestamps in this DB"
-      else
-        puts "Error: DB has #{duplicates.size} record(s) with duplicate timestamps"
-        duplicates.each { |date| puts date }
-        ret = true
+      ret = true
+
+      unless bad_dates.empty?
+        if verbose
+          puts "Error: DB has #{bad_dates.size} record(s) with out of order timestamps"
+          bad_dates.each { |date| puts date }
+        end
+        ret = false
       end
 
-      if nil_values.empty?
-        puts "There are no nil/undef/null values in this DB"
-      else
-        puts "Error: DB has #{nil_values.size} record(s) with nil/undef/null values"
-        nil_values.each { |date| puts date }
-        ret = true
+      unless duplicates.empty?
+        if verbose
+          puts "Error: DB has #{duplicates.size} record(s) with duplicate timestamps"
+          duplicates.each { |date| puts date }
+        end
+        ret = false
       end
 
-      if wraps.empty?
-        puts "There are no counter wraps in this DB"
-      else
-        puts "Error: DB has #{wraps.size} record(s) with counter wraps"
-        wraps.each { |date| puts date }
-        ret = true
+      unless nil_values.empty?
+        if verbose
+          puts "Error: DB has #{nil_values.size} record(s) with nil/undef/null values"
+          nil_values.each { |date| puts date }
+        end
+        ret = false
+      end
+
+      unless wraps.empty?
+        if verbose
+          puts "Error: DB has #{wraps.size} record(s) with counter wraps"
+          wraps.each { |date| puts date }
+        end
+        ret = false
       end
 
       ret

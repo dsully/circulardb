@@ -26,7 +26,7 @@ module CircularDB
     #
     # GNUPlot 4.2 adds: filledcurves & histograms. Common usage would be:
     # 'filledcurves above x1'
-    attr_accessor :style, :title, :fix_logscale, :type, :show_data, :show_trend, :logscale, :debug
+    attr_accessor :style, :title, :fix_logscale, :output_format, :show_data, :show_trend, :logscale, :debug
     attr_accessor :start_time, :end_time
     attr_reader :output, :size, :cdbs
 
@@ -101,9 +101,9 @@ module CircularDB
           name << " (#{cdb.units})"
         end
 
-        if name.length > @legend_max
-          name = name[0, (@legend_max - 5 / 2)] << '[...]'
-        end
+        #if name.length > @legend_max
+          #name = name[0, (@legend_max - 5 / 2)] << '[...]'
+        #end
 
         @cdbs[name] = cdb
 
@@ -113,14 +113,17 @@ module CircularDB
     def output=(output)
 
       if output 
+        ext = nil
+
         if output.respond_to?('path')
           ext = Filename.extname(output.path)
-        elsif output.class == 'String'
-          ext = File.extname(output) == ".svg"
+        elsif output.kind_of?(String)
+          ext = File.extname(output)
+        else
         end
 
         if ext == ".svg" 
-           self.type = "svg"
+           self.output_format = "svg"
         end
       else
         # output is nil. because gnuplot is kinda lame, create a temporary file.
@@ -129,6 +132,51 @@ module CircularDB
       end
 
       @output = output
+    end
+
+    def set_output(plot)
+
+      if @output_format == "svg"
+
+        case self.size
+          when "large"  then plot.terminal "svg size 1060 800 enhanced fname 'Trebuchet'"
+          when "medium" then plot.terminal "svg size  840 600 enhanced fname 'Trebuchet'"
+          else               plot.terminal "svg size  420 210 enhanced fname 'Tahoma' fsize 11"
+        end
+
+      elsif @output_format == "pngcairo"
+
+        case self.size
+          when "large"  then plot.terminal "pngcairo transparent size 1060,800"
+          when "medium" then plot.terminal "pngcairo transparent size 780,600"
+          else               plot.terminal "pngcairo transparent size 650,350"
+        end
+
+      else
+
+        case self.size
+          when "large"  then plot.terminal "png transparent small size 1060,800"
+          when "medium" then plot.terminal "png transparent small size 780,600"
+          else               plot.terminal "png transparent small size 650,350"
+        end
+
+      end
+
+      if @output
+
+        if @output.class == 'String' and @output !~ /^\s*$/
+          dirname = File.dirname(@output)
+
+          unless File.exists?(dirname)
+            FileUtils.mkdir_p(dirname)
+          end
+        end
+
+        plot.output @output
+      else
+        # Set output to be empty like gnuplot wants.
+        plot.sets << 'output'
+      end
     end
 
     # Generate the graph. It is possible to plot up to 8 different cdbs on the same
@@ -162,39 +210,9 @@ module CircularDB
       Gnuplot.open do |gp|
         Gnuplot::Plot.new(gp) do |plot|
 
-          if @type == "svg"
+          total_sum = 0.0
 
-            case size
-              when "large"  then plot.terminal "svg size 1060 800 enhanced fname 'Trebuchet'"
-              when "medium" then plot.terminal "svg size  840 600 enhanced fname 'Trebuchet'"
-              else               plot.terminal "svg size  420 210 enhanced fname 'Tahoma' fsize 11"
-            end
-
-          else
-
-            case size
-              when "large"  then plot.terminal "png transparent small size 1060,800"
-              when "medium" then plot.terminal "png transparent small size 780,600"
-              else               plot.terminal "png transparent small size 650,350"
-            end
-
-          end
-
-          if @output
-
-            if @output.class == 'String' and @output !~ /^\s*$/
-              dirname = File.dirname(@output)
-
-              unless File.exists?(dirname)
-                FileUtils.mkdir_p(dirname)
-              end
-            end
-
-            plot.output @output
-          else
-            # Set output to be empty like gnuplot wants.
-            plot.sets << 'output'
-          end
+          set_output(plot)
 
           if @logscale
             plot.logscale @logscale
@@ -211,11 +229,26 @@ module CircularDB
 
           plots = @cdbs.size
 
+          debug = false
           @cdbs.keys.sort.each do |name|
 
             cdb = @cdbs[name]
 
             records    = cdb.read_records(@start_time, @end_time, nil, for_graphing)
+
+            if records.empty? or records.first.nil?
+              puts "Busted read_records for: #{cdb.filename}"
+              plots -= 1
+              next
+            end
+
+            # 5 is arbitrary
+            if records.length < 5
+              puts "No records to plot for: #{cdb.filename}"
+              plots -= 1
+              next
+            end
+
             real_start = records.first.first
             real_end   = records.last.first
             stats      = cdb.statistics
@@ -227,13 +260,8 @@ module CircularDB
               puts "Sum is NaN for: #{cdb.filename}"
               plots -= 1
               next
-            end
-
-            # 5 is arbitrary
-            if records.first.nil? or records.last.nil? or records.length < 5
-              puts "No records to plot for: #{cdb.filename}"
-              plots -= 1
-              next
+            else
+              total_sum += sum
             end
 
             axis = axes[cdb.units]
@@ -316,9 +344,9 @@ module CircularDB
               records.each do |r|
                 # Rudimentary outlier rejection
                 # Zi = 0.6745 * abs(x - median) / MAD
-                if ((0.6745 * (r[1] - median).abs) / mad) > 3.5
-                  next
-                end
+                #if ((0.6745 * (r[1] - median).abs) / mad) > 3.5
+                  #next
+                #end
 
                 x << r[0]
                 y << r[1] / div
@@ -327,7 +355,7 @@ module CircularDB
               plot.data << Gnuplot::DataSet.new([x, y]) do |ds|
 
                 ds.title = name.gsub(/_/, '/')
-                ds.with  = "#{@style} lw 1.5 lt #{styles[num_plots]}"
+                ds.with  = "#{@style} lw 2 lt #{styles[num_plots]}"
 
                 if @show_data and @show_trend == 0
                   ds.using = "1:#{yaxis} axes #{axis}"
@@ -382,14 +410,24 @@ module CircularDB
             if axis =~ /y1/
               plot.format "y #{format}"
               plot.ylabel "\"#{units}\""
-              plot.yrange "[0:100]" if units =~ /percent/
-              plot.yrange "[0:*]" if units =~ /bytes|bits/
+
+              if units =~ /percent/
+                plot.yrange "[0:100]"
+              elsif units =~ /bytes|bits/
+                plot.yrange "[0:*]" unless total_sum == 0.0
+              end
+
               ylabel = units
             else
               plot.format "y2 #{format}"
               plot.y2label "\"#{units}\""
-              plot.y2range "[0:100]" if units =~ /percent/
-              plot.y2range "[0:*]" if units =~ /bytes|bits/
+
+              if units =~ /percent/
+                plot.y2range "[0:100]"
+              elsif units =~ /bytes|bits/
+                plot.y2range "[0:*]" unless total_sum == 0.0
+              end
+
               plot.y2tics
             end
           end
@@ -434,5 +472,45 @@ module CircularDB
       @cdbs = nil
     end
 
+  end
+end
+
+# Replace to have sets be a Hash instead of an Array.
+module Gnuplot
+  class Plot
+
+    def initialize (io = nil, cmd = "plot")
+      @cmd = cmd
+      @sets = {}
+      @data = []
+      yield self if block_given?
+
+      io << to_gplot if io
+    end
+
+    def set ( var, value = "" )
+      value = "'#{value}'" if QUOTED.include? var unless value =~ /^'.*'$/
+      @sets[var] = value
+    end
+
+    def to_gplot (io = "")
+      @sets.each_pair { |var, val| io << "set #{var} #{val}\n" }
+
+      if @data.size > 0 then
+        io << @cmd << " " << @data.collect { |e| e.plot_args }.join(", ")
+        io << "\n"
+
+        v = @data.collect { |ds| ds.to_gplot }
+        io << v.compact.join("e\n")
+      end
+
+      io
+    end
+  end
+end
+
+class Array
+  def to_gplot_fast
+    self.collect { |a| a.join(" ") }.join("\n") + "\ne"
   end
 end
