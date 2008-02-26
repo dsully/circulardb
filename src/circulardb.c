@@ -985,6 +985,8 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
     /* The first cdb is the driver */
     driver_num_recs = _cdb_read_records(cdbs[0], start, end, num_requested, cooked, first_time, last_time, &driver_records);
 
+    assert(driver_num_recs > 1);
+
     double *driver_x_values   = calloc(driver_num_recs, sizeof(double));
     double *driver_y_values   = calloc(driver_num_recs, sizeof(double));
     double *follower_x_values = calloc(driver_num_recs, sizeof(double));
@@ -1014,15 +1016,11 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
         cdb_record_t *follower_records = NULL;
 
         /* follower can't have more records than the driver */
-        if (cdbs[i]->header->num_records < driver_num_recs) {
-            continue;
-        }
+        assert(driver_num_recs <= cdbs[i]->header->num_records);
 
         follower_num_recs = _cdb_read_records(cdbs[i], start, end, num_requested, cooked, first_time, last_time, &follower_records);
 
-        if (follower_num_recs == 0) {
-            continue;
-        }
+        assert(follower_num_recs > 1);
 
         for (j = 0; j < driver_num_recs; j++) {
             follower_x_values[j] = follower_records[j].time;
