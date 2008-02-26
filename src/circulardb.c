@@ -377,6 +377,10 @@ uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
         return 0;
     }
 
+#ifdef DEBUG
+    printf("write_records: wrote [%"PRIu64"] records\n", num_recs);
+#endif
+
     return num_recs;
 }
 
@@ -440,7 +444,7 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
         }
 
 #ifdef DEBUG
-        printf("update_records: lrec [%llu] time [%d] rtime [%d]\n", lrec, time, rtime);
+        printf("update_records: lrec [%"PRIu64"] time [%d] rtime [%d]\n", lrec, (int)time, (int)rtime);
 #endif
 
         while (time == rtime && lrec < num_recs - 1) {
@@ -1189,10 +1193,6 @@ void cdb_free(cdb_t *cdb) {
         free(cdb);
         cdb = NULL;
     }
-}
-
-int circulardb_run() {
-    return 0;
 }
 
 /* -*- Mode: C; tab-width: 4 -*- */
