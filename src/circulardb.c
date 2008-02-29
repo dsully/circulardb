@@ -80,7 +80,7 @@ static uint64_t _physical_record_for_logical_record(cdb_header_t *header, int64_
 
     if (logical_record >= header->num_records) {
 #ifdef DEBUG
-        printf("Can't seek to record [%ld] with only [%"PRIu64"] in db\n", logical_record, header->num_records);
+        printf("Can't seek to record [%"PRIu64"] with only [%"PRIu64"] in db\n", logical_record, header->num_records);
 #endif
         return 0;
     }
@@ -410,7 +410,7 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
     num_recs = cdb->header->num_records;
 
 #ifdef DEBUG
-    printf("in update_records with [%ld] num_recs\n", num_recs);
+    printf("in update_records with [%"PRIu64"] num_recs\n", num_recs);
 #endif
 
     for (i = 0; i < len; i++) {
@@ -543,12 +543,11 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
 
     if (cdb->header->units) {
 
-        char *frequency;
+        char *frequency = calloc(strlen(cdb->header->units), sizeof(char));
 
-        /* %as is a GNU extension */
-        if ((sscanf(cdb->header->units, "per %d %as", &multiplier, &frequency) == 2) ||
-            (sscanf(cdb->header->units, "per %as", &frequency) == 1) ||
-            (sscanf(cdb->header->units, "%*s per %as", &frequency) == 1)) {
+        if ((sscanf(cdb->header->units, "per %d %s", &multiplier, frequency) == 2) ||
+            (sscanf(cdb->header->units, "per %s", frequency) == 1) ||
+            (sscanf(cdb->header->units, "%*s per %s", frequency) == 1)) {
 
             if (strcmp(frequency, "min") == 0) {
                 factor = 60;
@@ -571,9 +570,9 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
             if (factor != 0) {
                 factor *= multiplier;
             }
-
-            free(frequency);
         }
+
+        free(frequency);
     }
 
     return factor;
@@ -724,7 +723,7 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
 #ifdef DEBUG
     printf("read_records start: [%ld]\n", start);
     printf("read_records end: [%ld]\n", end);
-    printf("read_records num_requested: [%ld]\n", num_requested);
+    printf("read_records num_requested: [%"PRIu64"]\n", num_requested);
 #endif
 
     if (num_requested != 0 && num_requested < 0 && start == 0) {
