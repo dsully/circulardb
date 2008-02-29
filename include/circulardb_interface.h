@@ -28,7 +28,7 @@ extern "C" {
 #define CDB_DEFAULT_DATA_UNIT "absolute"
 #define CDB_DEFAULT_RECORDS 180000
 
-#define WRAP_AROUND ULONG_MAX
+#define CDB_NAN (double)(0.0/0.0)
 
 typedef struct cdb_header_s {
     char name[80];
@@ -36,6 +36,8 @@ typedef struct cdb_header_s {
     char units[80];
     char type[40];
     char version[10];
+//    double min_value;
+//    double max_value;
     uint64_t max_records;
     uint64_t num_records;
     uint64_t start_record;

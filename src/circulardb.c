@@ -308,6 +308,8 @@ void cdb_print_header(cdb_t * cdb) {
     printf("unit: [%s]\n", cdb->header->units);
     printf("type: [%s]\n", cdb->header->type);
     printf("version: [%s]\n", cdb->header->version);
+//    printf("min_value: [%g]\n", cdb->header->min_value);
+//    printf("max_value: [%g]\n", cdb->header->max_value);
     printf("max_records: [%"PRIu64"]\n", cdb->header->max_records);
     printf("num_records: [%"PRIu64"]\n", cdb->header->num_records);
     printf("start_record: [%"PRIu64"]\n", cdb->header->start_record);
@@ -328,6 +330,7 @@ uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
     }
 
     assert(_cdb_is_writable(cdb));
+    assert(cdb->header->max_records > 0);
 
     for (i = 0; i < len; i++) {
 
@@ -335,16 +338,15 @@ uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
         printf("writing record: [%d] [%f]\n", (int)records[i].time, records[i].value);
 #endif
 
-        off_t offset;
+        off_t offset = 0;
 
+        /* XXX - assert() here, or just ignore? */
         if (records[i].time == 0) {
 #ifdef DEBUG
             printf("write_records: time == 0; skipping!\n");
 #endif
             continue;
         }
-
-        assert(cdb->header->max_records);
 
         /* Do the circular wrap-around. start_record needs to start
          * incrementing with num_records */
@@ -413,15 +415,9 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
 
     for (i = 0; i < len; i++) {
 
-        time_t time  = records[i].time;
-        double value = records[i].value;
-
+        time_t time = records[i].time;
         time_t rtime;
         uint64_t lrec;
-
-#ifdef DEBUG
-        printf("updating record: [%d] [%.8g]\n", (int)time, value);
-#endif
 
         lrec = _logical_record_for_time(cdb, time, 0, 0);
 
@@ -444,15 +440,10 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
         }
 
 #ifdef DEBUG
-        printf("update_records: lrec [%"PRIu64"] time [%d] rtime [%d]\n", lrec, (int)time, (int)rtime);
+        printf("update_records: value: lrec [%"PRIu64"] time [%d] rtime [%d]\n", lrec, (int)time, (int)rtime);
 #endif
 
         while (time == rtime && lrec < num_recs - 1) {
-
-            /* DBL_MIN is used as the invalid value */
-            if (!value) {
-                value = DBL_MIN;
-            }
 
             _seek_to_logical_record(cdb, lrec);
 
@@ -516,7 +507,7 @@ uint64_t cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end)
             cdb_record_t record[RECORD_SIZE];
 
             record->time  = rtime;
-            record->value = DBL_MIN;
+            record->value = CDB_NAN;
 
             if (pwrite(cdb->fd, &record, RECORD_SIZE, offset) != RECORD_SIZE) {
                 break;
@@ -811,19 +802,16 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
     /* Deal with cooking the output */
     if (cooked) {
 
-        int factor = 0;
         int is_counter = 0;
+        //int check_min_max = 0;
         uint64_t i = 0;
         uint64_t cooked_recs = 0;
-        double new_value  = 0.0;
         double prev_value = 0.0;
-        double val_delta  = 0.0;
-        time_t time_delta = 0;
         time_t prev_date  = 0;
         
         cdb_record_t *crecords = calloc(nrecs, RECORD_SIZE);
 
-        factor = _compute_scale_factor_and_num_records(cdb, &num_requested);
+        int factor = _compute_scale_factor_and_num_records(cdb, &num_requested);
 
         *first_time = buffer[0].time;
         *last_time  = buffer[nrecs - 1].time;
@@ -837,28 +825,13 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
             time_t date  = buffer[i].time;
             double value = buffer[i].value;
 
-            if (!date || date < 0) {
-                continue;
-            }
-
-            if (value == DBL_MAX) {
-                value = DBL_MIN;
-            }
-
             if (is_counter) {
+                double new_value = value;
+                value = CDB_NAN;
 
-                new_value = value;
+                if (!isnan(prev_value) && !isnan(new_value)) {
 
-                value = DBL_MAX;
-
-                if (prev_value != DBL_MAX && new_value != DBL_MAX) {
-
-                    /* Handle counter wrap arounds */
-                    if (new_value >= prev_value) {
-                        val_delta = new_value - prev_value;
-                    } else {
-                        val_delta = (WRAP_AROUND -prev_value) + new_value;
-                    }
+                    double val_delta = new_value - prev_value;
 
                     if (val_delta >= 0) {
                         value = val_delta;
@@ -877,14 +850,21 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
                     continue;
                 }
 
-                time_delta = date - prev_date;
+                time_t time_delta = date - prev_date;
 
-                if (time_delta > 0 && value != DBL_MAX) {
+                if (time_delta > 0 && !isnan(value)) {
                     value = factor * (value / time_delta);
                 }
 
                 prev_date = date;
             }
+
+            /* Check for min/max boundaries */
+            /*if (check_min_max && !isnan(value)) {
+                if (value > cdb->header->max_value || value < cdb->header->min_value) {
+                    value = CDB_NAN;
+                }
+            }*/
 
             /* Copy the munged data to our new array, since we might skip
              * elements. Also keep in mind mmap for the future */
