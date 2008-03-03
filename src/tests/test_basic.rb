@@ -38,7 +38,7 @@ class TestCircularDB < Test::Unit::TestCase
   def test_rw
 
     records = Array.new
-    now     = Time.now.to_i
+    now     = Time.now
 
     (1..10).each { |i|
       records.push([ now, i.to_f ])
@@ -57,7 +57,7 @@ class TestCircularDB < Test::Unit::TestCase
 
     # Can't use assert_same(records, read) here, because the object_id's will be different.
     records.each_with_index { |entry, i|
-      assert_equal(records[i][0], read[i][0])
+      assert_equal(records[i][0].to_i, read[i][0])
       assert_equal(records[i][1], read[i][1])
     }
 
@@ -79,9 +79,32 @@ class TestCircularDB < Test::Unit::TestCase
 
     nil_check = cdb.read_records
 
-    assert_equal(nil_check[6][1], nil)
+    assert(nil_check[6][1].nan?)
 
     cdb.close
   end
 
+  def test_counter_reset
+    cdb = CircularDB::Storage.new(@file, File::CREAT|File::RDWR|File::EXCL, nil, @name, 180000, "counter")
+    assert(cdb)
+
+    records = Array.new
+    now     = Time.now.to_i
+
+    [10, 11, 12, 0, 1].each_with_index { |val,i|
+      records.push([ now+i, val.to_f ])
+    }
+
+    assert_equal(5, cdb.write_records(records))
+
+    read = cdb.read_records
+
+    assert_equal(10, read[0][1])
+    assert_equal(1, read[1][1])
+    assert_equal(1, read[2][1])
+    assert(read[3][1].nan?)
+    assert_equal(1, read[4][1])
+
+    cdb.close
+  end
 end

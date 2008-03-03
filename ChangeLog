@@ -1,3 +1,11 @@
+Version 0.1.9 (dan)
+	* Add reset test.
+	* Allow arbitrary graph sizes [PLATFORM-226]
+	* Fix name issue [PLATFORM-227]
+	* Fix nil causing an overflow to be recorded [PLATFORM-228]
+	* Fix reset counters causing an overflow [PLATFORM-229]
+	* Allow Ruby Time objects to be passed in directly. [PLATFORM-230]
+
 Version 0.1.8 (dan)
 	* Allow caller to set name of each data source via add_cdbs()
 	* Allow caller to get last_updated

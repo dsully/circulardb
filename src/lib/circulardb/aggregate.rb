@@ -44,6 +44,10 @@ module CircularDB
       @cdbs
     end
 
+    def filename
+      @cdbs[0].filename
+    end
+
     def driver_start_time
       @cdbs[0].read_records(0, 0, -1)[0][0]
     end

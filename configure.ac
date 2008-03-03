@@ -3,7 +3,7 @@ dnl - It should be specified as major.minor.revision [1.3.0]
 dnl - The third argument, should be replaced with the package 
 dnl - maintainers email address.
 
-AC_INIT([rubygem_circulardb], [0.1.8], [dan@powerset.com])
+AC_INIT([rubygem_circulardb], [0.1.9], [dan@powerset.com])
 SHORT_DESCRIPTION="CircularDB Ruby Bindings"
 
 dnl - The following prerequisites line can be used to specify

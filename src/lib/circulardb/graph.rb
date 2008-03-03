@@ -13,7 +13,14 @@ module CircularDB
 
     LEGEND_MAX_SIZE = 128
     SMALL_LEGEND_MAX_SIZE = 48
-    ONE_HOUR = 60 * 60
+    ONE_HOUR  = 60 * 60
+    VERA_FONT = '/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf' 
+
+    if File.exists?(VERA_FONT)
+      FONT = "font '#{VERA_FONT},9'"
+    else
+      FONT = ""
+    end
 
     @@gnuplot_fh = nil
 
@@ -27,7 +34,7 @@ module CircularDB
     # GNUPlot 4.2 adds: filledcurves & histograms. Common usage would be:
     # 'filledcurves above x1'
     attr_accessor :style, :title, :fix_logscale, :output_format, :show_data, :show_trend, :logscale, :debug
-    attr_accessor :start_time, :end_time
+    attr_accessor :start_time, :end_time, :size
     attr_reader :output, :size, :cdbs
 
     def initialize(output = nil, start_time = nil, end_time = nil, cdbs = [])
@@ -48,17 +55,6 @@ module CircularDB
       #if @@gnuplot_fh.nil?
       #  @@gnuplot_fh = IO::popen((Gnuplot.gnuplot(true) or raise 'gnuplot not found'), 'r+')
       #end
-    end
-
-    def size=(size)
-
-      if size == "small"
-        @legend_max = SMALL_LEGEND_MAX_SIZE
-      else 
-        @legend_max = LEGEND_MAX_SIZE
-      end
-
-      @size = size
     end
 
     # Takes a hash of name => cdb
@@ -82,7 +78,7 @@ module CircularDB
       @cdbs = Hash.new
 
       # Handle the singular case. 
-      if cdbs.class == CircularDB::Storage
+      if cdbs.kind_of?(CircularDB::Storage)
         cdbs = [cdbs]
       end
 
@@ -136,35 +132,21 @@ module CircularDB
 
     def set_output(plot)
 
-      if @output_format == "svg"
-
-        case self.size
-          when "large"  then plot.terminal "svg size 1060 800 enhanced fname 'Trebuchet'"
-          when "medium" then plot.terminal "svg size  840 600 enhanced fname 'Trebuchet'"
-          else               plot.terminal "svg size  420 210 enhanced fname 'Tahoma' fsize 11"
+      if @size.kind_of?(String)
+        case @size
+          when "large"  then @size = [1100,450]
+          when "medium" then @size = [900,400]
+          when "small"  then @size = [700,350]
         end
-
-      elsif @output_format == "pngcairo"
-
-        case self.size
-          when "large"  then plot.terminal "pngcairo transparent size 1060,800"
-          when "medium" then plot.terminal "pngcairo transparent size 780,600"
-          else               plot.terminal "pngcairo transparent size 650,350"
-        end
-
-      else
-
-        case self.size
-          when "large"  then plot.terminal "png transparent small size 1060,800"
-          when "medium" then plot.terminal "png transparent small size 780,600"
-          else               plot.terminal "png transparent small size 650,350"
-        end
-
+      elsif !@size.kind_of?(Array)
+        @size = [700,350]
       end
+
+      plot.terminal "#{@output_format || 'png'} transparent size #{@size.join(',')} enhanced #{FONT}"
 
       if @output
 
-        if @output.class == 'String' and @output !~ /^\s*$/
+        if @output.kind_of?(String) and @output !~ /^\s*$/
           dirname = File.dirname(@output)
 
           unless File.exists?(dirname)
@@ -223,7 +205,7 @@ module CircularDB
           end
 
           plot.grid
-          plot.key "below vertical"
+          plot.key "below horizontal"
           plot.xdata "time"
           plot.timefmt '"%s"'
 

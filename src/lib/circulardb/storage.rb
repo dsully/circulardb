@@ -75,9 +75,7 @@ module CircularDB
       end
 
       # XXX - why isn't this setting cooked properly
-      records = self.read_records
-
-      records.each { |entry|
+      self.read_records.each { |entry|
         date  = entry[0]
         value = entry[1]
 

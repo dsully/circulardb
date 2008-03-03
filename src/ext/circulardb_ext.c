@@ -15,6 +15,10 @@ static VALUE mCircularDB;
 static VALUE cStorage;
 static VALUE cAggregate;
 static VALUE cStatistics;
+static VALUE mTime;
+
+/* Symbol holders */
+static ID s_to_i;
 
 void print_class(char* token, VALUE obj) {
     VALUE class = rb_any_to_s(obj);
@@ -244,18 +248,7 @@ static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
     array = rb_ary_new2(cnt);
 
     for (i = 0; i < cnt; i++) {
-
-        VALUE entry = rb_ary_new2(2);
-
-        rb_ary_store(entry, 0, ULONG2NUM(records[i].time));
-        
-        if (records[i].value == DBL_MIN) {
-            rb_ary_store(entry, 1, Qnil);
-        } else {
-            rb_ary_store(entry, 1, rb_float_new(records[i].value));
-        }
-
-        rb_ary_store(array, i, entry);
+        rb_ary_store(array, i, rb_ary_new3(2, ULONG2NUM(records[i].time), rb_float_new(records[i].value)));
     }
 
     free(records);
@@ -263,6 +256,15 @@ static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
     _cdb_rb_update_header_hash(self, cdb);
 
     return array;
+}
+
+static VALUE _parse_time(VALUE time) {
+
+    if (rb_obj_is_kind_of(time, mTime)) {
+        time = rb_funcall(time, s_to_i, 0);
+    }
+
+    return NUM2ULONG(time);
 }
 
 /* Helper functions for write_* and update_* since they do almost the same * thing. */
@@ -277,11 +279,13 @@ static VALUE _cdb_write_or_update_records(VALUE self, VALUE array, int type) {
 
     Data_Get_Struct(self, cdb_t, cdb);
 
+    /* Turn any nil's into NaN */
     for (i = 0; i < len; i++) {
         VALUE record = rb_ary_entry(array, i);
+        VALUE value  = rb_ary_entry(record, 1);
 
-        records[i].time  = NUM2ULONG(rb_ary_entry(record, 0));
-        records[i].value = NUM2DBL(rb_ary_entry(record, 1));
+        records[i].time  = _parse_time(rb_ary_entry(record, 0));
+        records[i].value = value == Qnil ? CDB_NAN : NUM2DBL(value);
     }
 
     if (type == 1) {
@@ -307,15 +311,15 @@ static VALUE _cdb_write_or_update_record(VALUE self, VALUE time, VALUE value, in
 
     Data_Get_Struct(self, cdb_t, cdb);
 
-    /* Convert nil to DBL_MIN, which is what the circulardb code expects */
+    /* Convert nil to NAN, which is what the circulardb code expects */
     if (value == Qnil) {
-        value = rb_float_new(DBL_MIN);
+        value = rb_float_new(CDB_NAN);
     }
 
     if (type == 1) {
-        cnt = cdb_write_record(cdb, NUM2ULONG(time), NUM2DBL(value));
+        cnt = cdb_write_record(cdb, _parse_time(time), NUM2DBL(value));
     } else {
-        cnt = cdb_update_record(cdb, NUM2ULONG(time), NUM2DBL(value));
+        cnt = cdb_update_record(cdb, _parse_time(time), NUM2DBL(value));
     }
 
     if (cnt == 0) {
@@ -535,18 +539,7 @@ static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
     array = rb_ary_new2(cnt);
 
     for (i = 0; i < cnt; i++) {
-
-        VALUE entry = rb_ary_new2(2);
-
-        rb_ary_store(entry, 0, ULONG2NUM(records[i].time));
-        
-        if (records[i].value == DBL_MIN) {
-            rb_ary_store(entry, 1, Qnil);
-        } else {
-            rb_ary_store(entry, 1, rb_float_new(records[i].value));
-        }
-
-        rb_ary_store(array, i, entry);
+        rb_ary_store(array, i, rb_ary_new3(2, ULONG2NUM(records[i].time), rb_float_new(records[i].value)));
     }
 
     free(records);
@@ -697,6 +690,11 @@ static VALUE statistics_25th(VALUE self) {
 /****************************************************************************************
  * Ruby Class / Method glue
  ****************************************************************************************/
+
+/*
+ *  Document-class: mCircularDB
+ *  This is CircularDB 
+ */
 void Init_circulardb_ext() {
 
     mCircularDB = rb_const_get(rb_cObject, rb_intern("CircularDB"));
@@ -704,6 +702,7 @@ void Init_circulardb_ext() {
     cAggregate  = rb_define_class_under(mCircularDB, "Aggregate", rb_cObject);
     cStatistics = rb_define_class_under(mCircularDB, "Statistics", rb_cObject);
 
+    /* CircularDB::Storage class */
     rb_define_alloc_func(cStorage, cdb_rb_alloc);
     rb_define_method(cStorage, "initialize", cdb_rb_initialize, -1); 
     rb_define_method(cStorage, "open", cdb_rb_open_cdb, 0); 
@@ -722,11 +721,13 @@ void Init_circulardb_ext() {
     rb_define_method(cStorage, "_set_header", _set_header, 2); 
     rb_define_method(cStorage, "statistics", cdb_rb_statistics, -1); 
 
+    /* CircularDB::Aggregate class */
     rb_define_method(cAggregate, "initialize", cdb_agg_rb_initialize, 1); 
     rb_define_method(cAggregate, "read_records", cdb_agg_rb_read_records, -1); 
     rb_define_method(cAggregate, "print_records", cdb_agg_rb_print_records, -1); 
     rb_define_method(cAggregate, "statistics", cdb_agg_rb_statistics, -1); 
 
+    /* CircularDB::Statistics class */
     rb_define_alloc_func(cStatistics, cdb_statistics_rb_alloc);
     rb_define_method(cStatistics, "median", statistics_median, 0); 
     rb_define_method(cStatistics, "mad", statistics_mad, 0); 
@@ -744,4 +745,8 @@ void Init_circulardb_ext() {
     rb_define_method(cStatistics, "pct75th", statistics_75th, 0); 
     rb_define_method(cStatistics, "pct50th", statistics_50th, 0); 
     rb_define_method(cStatistics, "pct25th", statistics_25th, 0); 
+
+    /* To handle Time objects */
+    mTime = rb_const_get(rb_cObject, rb_intern("Time"));
+    s_to_i = rb_intern("to_i");
 }
