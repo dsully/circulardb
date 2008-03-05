@@ -4,46 +4,16 @@ module CircularDB
 
     require 'circulardb_ext'
 
-    def filename
-      @header[:filename]
+    [:name, :filename, :description, :units, :type, :num_records, :last_updated].each do |meth|
+      class_eval <<-METH
+        def #{meth}; @header[:#{meth}]; end
+      METH
     end
 
-    def name(pretty = 0)
-      name = @header[:name]
-
-      if pretty and description and description !~ /Circular DB.*/
-        name << " " << description
-      end
-
-      name
-    end
-
-    def description
-      @header[:description]
-    end
-
-    def description=(description) 
-      _set_header("description", description)
-    end
-
-    def units
-      @header[:units]
-    end
-
-    def units=(units)
-      _set_header("units", units)
-    end
-
-    def type
-      @header[:type]
-    end
-
-    def num_records
-      @header[:num_records]
-    end
-
-    def last_updated
-      @header[:last_updated]
+    [:name, :description, :units, :type].each do |meth|
+      class_eval <<-METH
+        def #{meth}=(value); _set_header("#{meth}", value); end
+      METH
     end
 
     # The number of cdbs in a cdb. Aggregate provides a real size.

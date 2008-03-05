@@ -39,6 +39,11 @@ module CircularDB
 
     def initialize(output = nil, start_time = nil, end_time = nil, cdbs = [])
 
+      # Force to an array. 
+      if cdbs.kind_of?(CircularDB::Storage) 
+        cdbs = [cdbs]
+      end
+
       @legend_max = SMALL_LEGEND_MAX_SIZE
 
       self.output       = output
