@@ -584,38 +584,42 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
 void _compute_statistics(cdb_range_t *range, uint64_t num_recs, cdb_record_t *records) {
 
     uint64_t i     = 0;
+    uint64_t valid = 0;
     double sum     = 0.0;
     double *values = calloc(num_recs, sizeof(double));
 
     for (i = 0; i < num_recs; i++) {
 
-        values[i] = records[i].value;
-        sum      += values[i];
+        if (!isnan(records[i].value)) { 
+
+            sum += values[valid] = records[i].value;
+            valid++;
+        }
     }
 
-    range->num_recs = num_recs;
-    range->mean     = gsl_stats_mean(values, 1, num_recs);
-    range->max      = gsl_stats_max(values, 1, num_recs);
-    range->min      = gsl_stats_min(values, 1, num_recs);
+    range->num_recs = valid;
+    range->mean     = gsl_stats_mean(values, 1, valid);
+    range->max      = gsl_stats_max(values, 1, valid);
+    range->min      = gsl_stats_min(values, 1, valid);
     range->sum      = sum;
-    range->stddev   = gsl_stats_sd(values, 1, num_recs);
-    range->absdev   = gsl_stats_absdev(values, 1, num_recs);
-    range->variance = gsl_stats_variance(values, 1, num_recs);
-    range->skew     = gsl_stats_skew(values, 1, num_recs);
-    range->kurtosis = gsl_stats_kurtosis(values, 1, num_recs);
+    range->stddev   = gsl_stats_sd(values, 1, valid);
+    range->absdev   = gsl_stats_absdev(values, 1, valid);
+    range->variance = gsl_stats_variance(values, 1, valid);
+    range->skew     = gsl_stats_skew(values, 1, valid);
+    range->kurtosis = gsl_stats_kurtosis(values, 1, valid);
 
     /* The rest need sorted data */
-    gsl_sort(values, 1, num_recs);
+    gsl_sort(values, 1, valid);
 
-    range->median   = gsl_stats_median_from_sorted_data(values, 1, num_recs);
-    range->pct95th  = gsl_stats_quantile_from_sorted_data(values, 1, num_recs, 0.95);
-    range->pct75th  = gsl_stats_quantile_from_sorted_data(values, 1, num_recs, 0.75);
-    range->pct50th  = gsl_stats_quantile_from_sorted_data(values, 1, num_recs, 0.50);
-    range->pct25th  = gsl_stats_quantile_from_sorted_data(values, 1, num_recs, 0.25);
+    range->median   = gsl_stats_median_from_sorted_data(values, 1, valid);
+    range->pct95th  = gsl_stats_quantile_from_sorted_data(values, 1, valid, 0.95);
+    range->pct75th  = gsl_stats_quantile_from_sorted_data(values, 1, valid, 0.75);
+    range->pct50th  = gsl_stats_quantile_from_sorted_data(values, 1, valid, 0.50);
+    range->pct25th  = gsl_stats_quantile_from_sorted_data(values, 1, valid, 0.25);
 
     /* MAD must come last because it alters the values array
      * http://en.wikipedia.org/wiki/Median_absolute_deviation */
-    for (i = 0; i < num_recs; i++) {
+    for (i = 0; i < valid; i++) {
         values[i] = fabs(values[i] - range->median);
 
         if (values[i] < 0.0) {
@@ -624,8 +628,8 @@ void _compute_statistics(cdb_range_t *range, uint64_t num_recs, cdb_record_t *re
     }
 
     /* Final sort is required MAD */
-    gsl_sort(values, 1, num_recs);
-    range->mad = gsl_stats_median_from_sorted_data(values, 1, num_recs);
+    gsl_sort(values, 1, valid);
+    range->mad = gsl_stats_median_from_sorted_data(values, 1, valid);
 
     free(values);
 }
@@ -945,8 +949,10 @@ void cdb_print(cdb_t *cdb) {
     time_t first_time, last_time;
 
     printf("============== Header ================\n");
-    cdb_read_header(cdb);
-    cdb_print_header(cdb);
+
+    if (cdb_read_header(cdb) == 0) {
+        cdb_print_header(cdb);
+    }
 
     printf("============== Records ================\n");
     cdb_print_records(cdb, 0, 0, 0, stdout, date_format, 0, &first_time, &last_time);

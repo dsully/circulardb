@@ -176,11 +176,32 @@ START_TEST (test_cdb_basic_rw)
 }
 END_TEST
 
-/* Aggregate tests */
 START_TEST (test_cdb_aggregate_basic)
 {
-
 /*
+    int i = 0;
+    time_t first_time, last_time;
+
+    cdb_range_t *range        = calloc(1, sizeof(cdb_range_t));
+    cdb_record_t w_records[RECORD_SIZE * 10];
+    cdb_record_t *r_records = NULL;
+
+    cdb_t *cdb = create_cdb("gauge", "absolute", 0);
+
+    for (i = 0; i < 10; i++) {
+        w_records[i].time  = i+1190860353;
+        w_records[i].value = i+1;
+    }
+
+    if (!cdb) fail("cdb is null");
+
+    fail_unless(cdb_write_records(cdb, w_records, 10) == 10, "Couldn't write 10 records");
+
+    fail_unless(
+        cdb_read_records(cdb, 0, 0, 0, 1, &first_time, &last_time, &r_records, range) == 10,
+        "Couldn't read 10 records"
+    );
+
     times = (0..10).collect { |i| Time.now.to_i + i }
 
     agg = CircularDB::Aggregate.new("test")
@@ -199,6 +220,14 @@ START_TEST (test_cdb_aggregate_basic)
 
     read = agg.read_records
 
+    for (i = 0; i < num_cdbs; i++) {
+        Data_Get_Struct(RARRAY(cdb_objects)->ptr[i], cdb_t, cdbs[i]);
+    }
+
+    cnt = cdb_read_aggregate_records(
+        cdbs, num_cdbs, start, end, num_req, cooked, &first_time, &last_time, &records, range
+    );
+
     assert_equal(10, read.length)
     assert_equal(10, agg.num_records)
 
@@ -212,7 +241,6 @@ START_TEST (test_cdb_aggregate_basic)
     assert_equal(16.5, agg.statistics.median)
     assert_equal(16.5, agg.statistics.mean)
 */
-
 }
 END_TEST
 
@@ -237,6 +265,8 @@ START_TEST (test_cdb_overflow)
 
     fail_unless(isnan(r_records[0].value));
     fail_unless(r_records[1].value == 2);
+
+    // check that sum isn't nan
 
     free(range);
     free(r_records);
