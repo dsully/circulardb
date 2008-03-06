@@ -249,11 +249,11 @@ int _cdb_is_writable(cdb_t *cdb) {
 int cdb_read_header(cdb_t *cdb) {
 
     /* if the header has already been read from backing store do not read again */
-    if (cdb->header != NULL && cdb->synced == 1) {
+    if ((cdb)->header != 0 && cdb->synced == 1) {
         return 0;
     }
 
-    if (cdb_open(cdb) > 0) {
+    if (cdb_open(cdb) != 0) {
         return errno;
     }
 
@@ -541,7 +541,7 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
         }
     }
 
-    if (cdb->header->units) {
+    if (&((cdb)->header)->units != 0) {
 
         char *frequency = calloc(strlen(cdb->header->units), sizeof(char));
 
@@ -915,7 +915,7 @@ uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requ
 
     num_recs = _cdb_read_records(cdb, start, end, num_requested, cooked, first_time, last_time, records);
 
-    if (range != NULL) {
+    if (range != 0 && num_recs > 0) {
         range->start_time = start;
         range->end_time = end;
 
@@ -970,6 +970,8 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
     uint64_t i = 0;
     uint64_t driver_num_recs = 0;
     cdb_record_t *driver_records = NULL;
+
+    assert(cdbs[0]);
 
     /* The first cdb is the driver */
     driver_num_recs = _cdb_read_records(cdbs[0], start, end, num_requested, cooked, first_time, last_time, &driver_records);
