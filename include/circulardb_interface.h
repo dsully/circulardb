@@ -86,31 +86,56 @@ typedef enum cdb_statistics_enum_s {
     CDB_25TH,
 } cdb_statistics_enum_t;
 
+/* Error codes */
+enum {
+    CDB_SUCCESS  = 0,
+    CDB_FAILURE  = -1,
+    CDB_ETMRANGE = 1,   /* invalid time range */
+    CDB_EFAULT   = 2,   /* invalid pointer */
+    CDB_EINVAL   = 3,   /* invalid argument supplied by user */
+    CDB_EFAILED  = 4,   /* generic failure */
+    CDB_ESANITY  = 5,   /* sanity check failed - shouldn't happen */
+    CDB_ENOMEM   = 6,   /* malloc failed */
+    CDB_EINVMAX  = 7,   /* max_records is invalid */ 
+    CDB_ERDONLY  = 8,   /* Trying to write to a read-only database */
+    CDB_ENORECS  = 9,   /* No records were returned when they were expected */
+    CDB_EINTERPD = 10,   /* Aggregate driver failure */ 
+    CDB_EINTERPF = 11,  /* Aggregate follower failure */
+};
+
 #define RECORD_SIZE sizeof(cdb_record_t)
 #define HEADER_SIZE sizeof(cdb_header_t)
 #define RANGE_SIZE  sizeof(cdb_range_t)
 
+/* Basic CDB handling functions */
 cdb_t* cdb_new(void);
-void cdb_free(cdb_t *cdb);
+
+/* Return CDB_SUCCESS or errno */
+int cdb_free(cdb_t *cdb);
 int cdb_open(cdb_t *cdb);
 int cdb_close(cdb_t *cdb);
+int cdb_read_header(cdb_t *cdb);
+
+/* Return CDB_SUCCESS, CDB_ERDONLY or errno */
+int cdb_write_header(cdb_t *cdb);
 
 void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, char* type, char* units, char* description);
 
-int cdb_read_header(cdb_t *cdb);
-int cdb_write_header(cdb_t *cdb);
-
+/* Return CDB_SUCCESS, CDB_ERDONLY, CDB_EINVMAX or errno */
 int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t *num_recs);
 bool cdb_write_record(cdb_t *cdb, time_t time, double value);
 
 /* Update particular record(s) in the DB after they have already been written. */
+/* Return CDB_SUCCESS, CDB_ERDONLY or errno */
 int cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t *num_recs);
 bool cdb_update_record(cdb_t *cdb, time_t time, double value);
 
+/* Return CDB_SUCCESS, CDB_ERDONLY or errno */
 int cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end, uint64_t *num_recs);
 
 double cdb_get_statistic(cdb_range_t *range, cdb_statistics_enum_t type);
 
+/* Return CDB_SUCCESS, CDB_ENOMEM, CDB_ETMRANGE, CDB_ENORECS or errno */
 int cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested,
     int cooked, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range);
 
@@ -122,6 +147,7 @@ void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_request
 void cdb_print(cdb_t *cdb);
 
 /* Aggregation interface */
+/* Return CDB_SUCCESS, CDB_ENOMEM, CDB_ETMRANGE, CDB_ENORECS, CDB_EINTERPD, CDB_EINTERPF or errno */
 int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
     int cooked, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range);
 
