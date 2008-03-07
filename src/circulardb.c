@@ -502,7 +502,7 @@ int cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end, uint
     uint64_t i = 0;
     int64_t lrec;
     off_t offset = RECORD_SIZE;
-    num_recs = 0;
+    *num_recs = 0;
 
     if (cdb_read_header(cdb) > 0) {
         return errno;
@@ -780,6 +780,7 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
     }
 
     if (cdb->header->num_records == 0) {
+        /* XXX - need our own errno */
         return 0;
     }
 
@@ -794,13 +795,14 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
         uint64_t rlen = RECORD_SIZE * nrec;
 
         if ((buffer = calloc(1, rlen)) == NULL) {
+            free(buffer);
             return ENOMEM;
         }
 
         /* one slurp - XXX TODO - mmap */
         if (read(cdb->fd, buffer, rlen) != rlen) {
             free(buffer);
-            return 0;
+            return errno;
         }
 
         *num_recs = nrec;
@@ -815,17 +817,18 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
         uint64_t rlen2 = RECORD_SIZE * nrec2;
 
         if ((buffer = calloc(1, rlen1 + rlen2)) == NULL) {
+            free(buffer);
             return ENOMEM;
         }
 
         if (read(cdb->fd, buffer, rlen1) != rlen1) {
             free(buffer);
-            return 0;
+            return errno;
         }
 
         if (pread(cdb->fd, &buffer[nrec1], rlen2, HEADER_SIZE) != rlen2) {
             free(buffer);
-            return 0;
+            return errno;
         }
 
         *num_recs = nrec1 + nrec2;
@@ -844,10 +847,14 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
         cdb_record_t *crecords;
 
         if ((crecords = calloc(*num_recs, RECORD_SIZE)) == NULL) {
+            free(crecords);
+            free(buffer);
             return ENOMEM;
         }
 
         if (_compute_scale_factor_and_num_records(cdb, &num_requested, &factor)) {
+            free(crecords);
+            free(buffer);
             return errno;
         }
 
@@ -927,6 +934,7 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
         *num_recs = abs(num_requested);
 
         if ((*records  = calloc(*num_recs, RECORD_SIZE)) == NULL) {
+            free(buffer);
             return ENOMEM;
         }
 
