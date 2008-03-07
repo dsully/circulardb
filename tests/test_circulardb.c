@@ -59,7 +59,7 @@ END_TEST
 START_TEST (test_cdb_basic_rw)
 {
     int i = 0;
-    time_t first_time, last_time;
+    uint64_t num_recs = 0;
 
     cdb_range_t *range        = calloc(1, sizeof(cdb_range_t));
     cdb_record_t w_records[RECORD_SIZE * 10];
@@ -74,18 +74,19 @@ START_TEST (test_cdb_basic_rw)
 
     if (!cdb) fail("cdb is null");
 
-    fail_unless(cdb_write_records(cdb, w_records, 10) == 10, "Couldn't write 10 records");
+    cdb_write_records(cdb, w_records, 10, &num_recs);
 
-    fail_unless(
-        cdb_read_records(cdb, 0, 0, 0, 1, &first_time, &last_time, &r_records, range) == 10,
-        "Couldn't read 10 records"
-    );
+    fail_unless(num_recs == 10, "Couldn't write 10 records");
 
+    num_recs = 0;
+    cdb_read_records(cdb, 0, 0, 0, 1, &num_recs, &r_records, range);
+
+    fail_unless(num_recs == 10, "Couldn't read 10 records");
     fail_unless(cdb->header->num_records == 10, "header count doesn't match");
 
     for (i = 0; i < 10; i++) {
-        fail_unless(w_records[i].time == r_records[i].time, NULL);
-        fail_unless(w_records[i].value == r_records[i].value, NULL);
+        fail_unless(w_records[i].time == r_records[i].time, "write time != read time");
+        fail_unless(w_records[i].value == r_records[i].value, "write value != read value");
     }
 
     fail_unless(cdb_get_statistic(range, CDB_MEAN) == 5.5, "Invalid MEAN");
@@ -96,21 +97,23 @@ START_TEST (test_cdb_basic_rw)
 
     {
         /* Check setting a float and reading it back. */
-        fail_unless(cdb_update_record(cdb, r_records[5].time, 999.0005) == 1, "Couldn't update record");
+        fail_unless(cdb_update_record(cdb, r_records[5].time, 999.0005) == true, "Couldn't update record");
 
-        range = NULL;
-        r_records = NULL;
-        cdb_read_records(cdb, 0, 0, 0, 1, &first_time, &last_time, &r_records, range);
+        memset(range, 0, sizeof(cdb_range_t));
+        memset(r_records, 0, sizeof(r_records));
+        num_recs = 0;
+        cdb_read_records(cdb, 0, 0, 0, 1, &num_recs, &r_records, range);
 
         fail_unless(r_records[5].value == 999.0005, "Float check");
     }
 
     {
-        range = NULL;
-        r_records = NULL;
-        uint64_t cnt = cdb_read_records(cdb, 0, 0, 4, 1, &first_time, &last_time, &r_records, range);
+        memset(range, 0, sizeof(cdb_range_t));
+        memset(r_records, 0, sizeof(r_records));
+        num_recs = 0;
+        cdb_read_records(cdb, 0, 0, 4, 1, &num_recs, &r_records, range);
 
-        fail_unless(cnt == 4, "Requested numreqs");
+        fail_unless(num_recs == 4, "Requested numreqs");
         fail_unless(r_records[0].value == 7, NULL);
         fail_unless(r_records[1].value == 8, NULL);
         fail_unless(r_records[2].value == 9, NULL);
@@ -118,11 +121,12 @@ START_TEST (test_cdb_basic_rw)
     }
 
     {
-        range = NULL;
-        r_records = NULL;
-        uint64_t cnt = cdb_read_records(cdb, 0, 0, -4, 1, &first_time, &last_time, &r_records, range);
+        memset(range, 0, sizeof(cdb_range_t));
+        memset(r_records, 0, sizeof(r_records));
+        num_recs = 0;
+        cdb_read_records(cdb, 0, 0, -4, 1, &num_recs, &r_records, range);
 
-        fail_unless(cnt == 4, "Requested numreqs");
+        fail_unless(num_recs == 4, "Requested numreqs");
         fail_unless(r_records[0].value == 1, NULL);
         fail_unless(r_records[1].value == 2, NULL);
         fail_unless(r_records[2].value == 3, NULL);
@@ -130,42 +134,46 @@ START_TEST (test_cdb_basic_rw)
     }
 
     {
-        range = NULL;
-        r_records = NULL;
-        uint64_t cnt = cdb_read_records(cdb, 1190860355, 0, 0, 1, &first_time, &last_time, &r_records, range);
+        memset(range, 0, sizeof(cdb_range_t));
+        memset(r_records, 0, sizeof(r_records));
+        num_recs = 0;
+        cdb_read_records(cdb, 1190860355, 0, 0, 1, &num_recs, &r_records, range);
 
-        fail_unless(cnt == 8, "Requested numreqs");
+        fail_unless(num_recs == 8, "Requested numreqs");
         fail_unless(r_records[0].time == 1190860355, NULL);
         fail_unless(r_records[1].time == 1190860356, NULL);
     }
 
     {
-        range = NULL;
-        r_records = NULL;
-        uint64_t cnt = cdb_read_records(cdb, 0, 1190860355, 0, 1, &first_time, &last_time, &r_records, range);
+        memset(range, 0, sizeof(cdb_range_t));
+        memset(r_records, 0, sizeof(r_records));
+        num_recs = 0;
+        cdb_read_records(cdb, 0, 1190860355, 0, 1, &num_recs, &r_records, range);
 
-        fail_unless(cnt == 3, "Requested numreqs");
+        fail_unless(num_recs == 3, "Requested numreqs");
         fail_unless(r_records[0].time == 1190860353, NULL);
         fail_unless(r_records[1].time == 1190860354, NULL);
         fail_unless(r_records[2].time == 1190860355, NULL);
     }
 
     {
-        range = NULL;
-        r_records = NULL;
-        uint64_t cnt = cdb_read_records(cdb, 1190860353, 1190860355, 0, 1, &first_time, &last_time, &r_records, range);
+        memset(range, 0, sizeof(cdb_range_t));
+        memset(r_records, 0, sizeof(r_records));
+        num_recs = 0;
+        cdb_read_records(cdb, 1190860353, 1190860355, 0, 1, &num_recs, &r_records, range);
 
-        fail_unless(cnt == 2, "Requested numreqs");
+        fail_unless(num_recs == 2, "Requested numreqs");
         fail_unless(r_records[0].time == 1190860354, NULL);
         fail_unless(r_records[1].time == 1190860355, NULL);
     }
 
     {
-        range = NULL;
-        r_records = NULL;
-        uint64_t cnt = cdb_read_records(cdb, 1190860353, 1190860360, -1, 1, &first_time, &last_time, &r_records, range);
+        memset(range, 0, sizeof(cdb_range_t));
+        memset(r_records, 0, sizeof(r_records));
+        num_recs = 0;
+        cdb_read_records(cdb, 1190860353, 1190860360, -1, 1, &num_recs, &r_records, range);
 
-        fail_unless(cnt == 1, "Requested numreqs");
+        fail_unless(num_recs == 1, "Requested numreqs");
         fail_unless(r_records[0].time == 1190860354, NULL);
     }
 
@@ -180,7 +188,6 @@ START_TEST (test_cdb_aggregate_basic)
 {
 /*
     int i = 0;
-    time_t first_time, last_time;
 
     cdb_range_t *range        = calloc(1, sizeof(cdb_range_t));
     cdb_record_t w_records[RECORD_SIZE * 10];
@@ -198,7 +205,7 @@ START_TEST (test_cdb_aggregate_basic)
     fail_unless(cdb_write_records(cdb, w_records, 10) == 10, "Couldn't write 10 records");
 
     fail_unless(
-        cdb_read_records(cdb, 0, 0, 0, 1, &first_time, &last_time, &r_records, range) == 10,
+        cdb_read_records(cdb, 0, 0, 0, 1, &num_recs, &r_records, range) == 10,
         "Couldn't read 10 records"
     );
 
@@ -225,7 +232,7 @@ START_TEST (test_cdb_aggregate_basic)
     }
 
     cnt = cdb_read_aggregate_records(
-        cdbs, num_cdbs, start, end, num_req, cooked, &first_time, &last_time, &records, range
+        cdbs, num_cdbs, start, end, num_req, cooked, &num_recs, &records, range
     );
 
     assert_equal(10, read.length)
@@ -248,7 +255,7 @@ START_TEST (test_cdb_overflow)
 {
     cdb_record_t *r_records = NULL;
     cdb_range_t *range      = calloc(1, sizeof(cdb_range_t));
-    time_t first_time, last_time;
+    uint64_t num_recs = 0;
 
     cdb_t *cdb = create_cdb("counter", "requests per sec", 0);
 
@@ -258,10 +265,9 @@ START_TEST (test_cdb_overflow)
     cdb_write_record(cdb, 1190860364, 10);
     cdb_write_record(cdb, 1190860365, 12);
 
-    fail_unless(
-        cdb_read_records(cdb, 0, 0, 0, 1, &first_time, &last_time, &r_records, range) == 2,
-        "Couldn't read 2 records"
-    );
+    cdb_read_records(cdb, 0, 0, 0, 1, &num_recs, &r_records, range);
+
+    fail_unless(num_recs == 2, "Couldn't read 2 records");
 
     fail_unless(isnan(r_records[0].value));
     fail_unless(r_records[1].value == 2);
@@ -279,7 +285,7 @@ START_TEST (test_cdb_wrap)
 {
     cdb_record_t *r_records = NULL;
     cdb_range_t *range      = calloc(1, sizeof(cdb_range_t));
-    time_t first_time, last_time;
+    uint64_t num_recs = 0;
 
     cdb_t *cdb = create_cdb("gauge", "percent", 5);
 
@@ -292,11 +298,9 @@ START_TEST (test_cdb_wrap)
     cdb_write_record(cdb, 1190860367, 18);
     cdb_write_record(cdb, 1190860368, 20);
 
-    fail_unless(
-        cdb_read_records(cdb, 0, 0, 0, 1, &first_time, &last_time, &r_records, range) == 5,
-        "Couldn't read 5 records"
-    );
+    cdb_read_records(cdb, 0, 0, 0, 1, &num_recs, &r_records, range);
 
+    fail_unless(num_recs == 5, "Couldn't read 5 records");
     fail_unless(r_records[0].value == 12);
 
     free(range);

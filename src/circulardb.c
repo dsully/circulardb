@@ -234,22 +234,22 @@ static int64_t _logical_record_for_time(cdb_t *cdb, time_t req_time, int64_t sta
     return _logical_record_for_time(cdb, req_time, start_logical_record, end_logical_record);
 }
 
-int _cdb_is_writable(cdb_t *cdb) {
+bool _cdb_is_writable(cdb_t *cdb) {
 
     /* We can't check for the O_RDONLY bit being because its defined value is zero.
      * i.e. there are no bits set to look for. We therefore assume 
      * O_RDONLY if neither O_WRONLY nor O_RDWR are set. */
     if (cdb->flags & O_RDWR) {
-        return 1;
+        return true;
     }
 
-    return 0;
+    return false;
 }
 
 int cdb_read_header(cdb_t *cdb) {
 
     /* if the header has already been read from backing store do not read again */
-    if ((cdb)->header != 0 && cdb->synced == 1) {
+    if (cdb->synced) {
         return 0;
     }
 
@@ -261,7 +261,7 @@ int cdb_read_header(cdb_t *cdb) {
         return errno;
     }
 
-    cdb->synced = 1;
+    cdb->synced = true;
 
     return 0;
 }
@@ -270,14 +270,18 @@ int cdb_write_header(cdb_t *cdb) {
 
     time_t now;
 
-    if (!_cdb_is_writable(cdb) || cdb->synced == 1) {
+    if (cdb->synced) {
         return 0;
+    }
+
+    if (_cdb_is_writable(cdb) == false) {
+        errno = EBADF;
     }
 
     time(&now);
 
     cdb->header->last_updated = now;
-    cdb->synced = 0;
+    cdb->synced = false;
 
     if (cdb_open(cdb) > 0) {
         return errno;
@@ -296,7 +300,7 @@ int cdb_write_header(cdb_t *cdb) {
 #endif
 #endif
 
-    cdb->synced = 1;
+    cdb->synced = true;
 
     return 0;
 }
@@ -316,20 +320,22 @@ void cdb_print_header(cdb_t * cdb) {
     printf("last_updated: [%d]\n", (int)cdb->header->last_updated);
 }
 
-uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
+int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t *num_recs) {
 
     /* read old header if it exists.
        write a header out, since the db may not have existed.
     */
-    uint64_t num_recs = 0;
     uint64_t i = 0;
+    *num_recs  = 0;
 
-    /* XXX - Kinda hacky.. since no exceptions. Below with write_header as well */
     if (cdb_read_header(cdb) > 0) {
-        return 0;
+        return errno;
     }
 
-    assert(_cdb_is_writable(cdb));
+    if (_cdb_is_writable(cdb) == false) {
+        return EBADF;
+    }
+
     assert(cdb->header->max_records > 0);
 
     for (i = 0; i < len; i++) {
@@ -363,54 +369,60 @@ uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
         }
 
         if (pwrite(cdb->fd, &records[i], RECORD_SIZE, offset) != RECORD_SIZE) {
-            fprintf(stderr, "Couldn't write record [%d] [%s] for: [%s]\n", errno, strerror(errno), cdb->filename);
-            break;
+            /* If a write fails, do we even try to write_header() ? */
+            // fprintf(stderr, "Couldn't write record [%d] [%s] for: [%s]\n", errno, strerror(errno), cdb->filename);
+            return errno;
         }
 
-        num_recs += 1;
+        *num_recs += 1;
         /* DRK might want to consider periodic syncs? */
     }
 
-    if (num_recs > 0) {
-        cdb->synced = 0;
+    if (*num_recs > 0) {
+        cdb->synced = false;
     }
 
     if (cdb_write_header(cdb) > 0) {
-        return 0;
+        return errno;
     }
 
 #ifdef DEBUG
-    printf("write_records: wrote [%"PRIu64"] records\n", num_recs);
+    printf("write_records: wrote [%"PRIu64"] records\n", *num_recs);
 #endif
 
-    return num_recs;
+    return 0;
 }
 
 bool cdb_write_record(cdb_t *cdb, time_t time, double value) {
 
     cdb_record_t record[RECORD_SIZE];
+    uint64_t num_recs = 0;
 
     record->time  = time;
     record->value = value;
 
-    return (bool)cdb_write_records(cdb, record, 1);
+    if (cdb_write_records(cdb, record, 1, &num_recs) != 0) {
+        return false;
+    }
+
+    return true;
 }
 
-uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
+int cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t *num_recs) {
 
-    uint64_t num_recs = 0;
+    *num_recs  = 0;
     uint64_t i = 0;
 
     if (cdb_read_header(cdb) > 0) {
-        return 0;
+        return errno;
     }
 
-    assert(_cdb_is_writable(cdb));
-
-    num_recs = cdb->header->num_records;
+    if (_cdb_is_writable(cdb) == false) {
+        return EBADF;
+    }
 
 #ifdef DEBUG
-    printf("in update_records with [%"PRIu64"] num_recs\n", num_recs);
+    printf("in update_records with [%"PRIu64"] num_recs\n", cdb->header->num_records);
 #endif
 
     for (i = 0; i < len; i++) {
@@ -429,7 +441,7 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
 
         rtime = _time_for_logical_record(cdb, lrec);
 
-        while (rtime < time && lrec < num_recs - 1) {
+        while (rtime < time && lrec < cdb->header->num_records - 1) {
 
             /* DRK is this true? or is the condition (lrec - start_lrec) <
                num_recs -- seems you can't wrap here (i.e. what if the initial
@@ -443,7 +455,7 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
         printf("update_records: value: lrec [%"PRIu64"] time [%d] rtime [%d]\n", lrec, (int)time, (int)rtime);
 #endif
 
-        while (time == rtime && lrec < num_recs - 1) {
+        while (time == rtime && lrec < cdb->header->num_records - 1) {
 
             _seek_to_logical_record(cdb, lrec);
 
@@ -459,38 +471,46 @@ uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len) {
     }
 
     if (i > 0) {
-        cdb->synced = 0;
+        cdb->synced = false;
+        *num_recs = i;
     }
 
     if (cdb_write_header(cdb) > 0) {
-        return 0;
+        return errno;
     }
 
-    return i;
+    return 0;
 }
 
 bool cdb_update_record(cdb_t *cdb, time_t time, double value) {
 
     cdb_record_t record[RECORD_SIZE];
+    uint64_t num_recs = 0;
 
     record->time  = time;
     record->value = value;
 
-    return (bool)cdb_update_records(cdb, record, 1);
-}
-
-uint64_t cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end) {
-
-    uint64_t i = 0;
-    uint64_t num_updated = 0;
-    int64_t lrec;
-    off_t offset = RECORD_SIZE;
-
-    if (cdb_read_header(cdb) > 0) {
-        return 0;
+    if (cdb_update_records(cdb, record, 1, &num_recs) != 0) {
+        return false;
     }
 
-    assert(_cdb_is_writable(cdb));
+    return true;
+}
+
+int cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end, uint64_t *num_recs) {
+
+    uint64_t i = 0;
+    int64_t lrec;
+    off_t offset = RECORD_SIZE;
+    num_recs = 0;
+
+    if (cdb_read_header(cdb) > 0) {
+        return errno;
+    }
+
+    if (_cdb_is_writable(cdb) == false) {
+        return EBADF;
+    }
 
     lrec = _logical_record_for_time(cdb, start, 0, 0);
 
@@ -510,24 +530,25 @@ uint64_t cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end)
             record->value = CDB_NAN;
 
             if (pwrite(cdb->fd, &record, RECORD_SIZE, offset) != RECORD_SIZE) {
-                break;
+                return errno;
             }
 
-            num_updated += 1;
+            *num_recs += 1;
         }
     }
 
-    return num_updated;
+    if (*num_recs > 0) {
+        cdb->synced = false;
+    }
+
+    if (cdb_write_header(cdb) > 0) {
+        return errno;
+    }
+
+    return 0;
 }
 
-static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_records) {
-
-    long factor = 0;
-    int  multiplier = 1;
-
-    if (cdb_read_header(cdb) > 0) {
-        return 0;
-    }
+static int _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_records, long *factor) {
 
     if (strcmp(cdb->header->type, "counter") == 0) {
 
@@ -541,54 +562,59 @@ static long _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_recor
         }
     }
 
-    if (&((cdb)->header)->units != 0) {
+    if (strlen(cdb->header->units) > 0) {
 
-        char *frequency = calloc(strlen(cdb->header->units), sizeof(char));
+        int multiplier = 1;
+        char *frequency;
+ 
+        if ((frequency = calloc(strlen(cdb->header->units), sizeof(char))) == NULL) {
+            return ENOMEM;
+        }
 
         if ((sscanf(cdb->header->units, "per %d %s", &multiplier, frequency) == 2) ||
             (sscanf(cdb->header->units, "per %s", frequency) == 1) ||
             (sscanf(cdb->header->units, "%*s per %s", frequency) == 1)) {
 
             if (strcmp(frequency, "min") == 0) {
-                factor = 60;
+                *factor = 60;
             } else if (strcmp(frequency, "hour") == 0) {
-                factor = 60 * 60;
-            } else if (strcmp(frequency, "sec") == 0) {
-                factor = 1;
+                *factor = 60 * 60;
+            } else if (strcmp(frequency, "sec") == 0 || strcmp(frequency, "second") == 0) {
+                *factor = 1;
             } else if (strcmp(frequency, "day") == 0) {
-                factor = 60 * 60 * 24;
+                *factor = 60 * 60 * 24;
             } else if (strcmp(frequency, "week") == 0) {
-                factor = 60 * 60 * 24 * 7;
+                *factor = 60 * 60 * 24 * 7;
             } else if (strcmp(frequency, "month") == 0) {
-                factor = 60 * 60 * 24 * 30;
+                *factor = 60 * 60 * 24 * 30;
             } else if (strcmp(frequency, "quarter") == 0) {
-                factor = 60 * 60 * 24 * 90;
+                *factor = 60 * 60 * 24 * 90;
             } else if (strcmp(frequency, "year") == 0) {
-                factor = 60 * 60 * 24 * 365;
+                *factor = 60 * 60 * 24 * 365;
             } 
 
-            if (factor != 0) {
-                factor *= multiplier;
+            if (*factor != 0) {
+                *factor *= multiplier;
             }
         }
 
         free(frequency);
     }
 
-    return factor;
+    return 0;
 }
 
 /* Statistics code
  * Make only one call to reading for a particular time range and compute all our stats
  */
-void _compute_statistics(cdb_range_t *range, uint64_t num_recs, cdb_record_t *records) {
+void _compute_statistics(cdb_range_t *range, uint64_t *num_recs, cdb_record_t *records) {
 
     uint64_t i     = 0;
     uint64_t valid = 0;
     double sum     = 0.0;
-    double *values = calloc(num_recs, sizeof(double));
+    double *values = calloc(*num_recs, sizeof(double));
 
-    for (i = 0; i < num_recs; i++) {
+    for (i = 0; i < *num_recs; i++) {
 
         if (!isnan(records[i].value)) { 
 
@@ -673,20 +699,19 @@ double cdb_get_statistic(cdb_range_t *range, cdb_statistics_enum_t type) {
     }
 }
 
-uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, 
-    int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records) {
+static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, 
+    int cooked, uint64_t *num_recs, cdb_record_t **records) {
 
     int64_t first_requested_logical_record;
     int64_t last_requested_logical_record;
     uint64_t last_requested_physical_record;
     int64_t seek_logical_record;
     uint64_t seek_physical_record;
-    uint64_t nrecs = 0;
 
     cdb_record_t *buffer = NULL;
 
     if (cdb_read_header(cdb) > 0) {
-        return 0;
+        return errno;
     }
 
     if (start != 0 && end != 0 && end < start) {
@@ -696,7 +721,7 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
         return -1;
     }
 
-    if (cdb->header == NULL || cdb->synced != 1) {
+    if (cdb->header == NULL || cdb->synced == false) {
 #ifdef DEBUG
         printf("read_records: Nothing to read in [%s]\n", cdb->filename);
 #endif
@@ -708,7 +733,7 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
 #ifdef DEBUG
         printf("read_records: No records!\n");
 #endif
-        return 0;
+        return -3;
     }
 
     /*
@@ -768,7 +793,9 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
         uint64_t nrec = (last_requested_physical_record - seek_physical_record + 1);
         uint64_t rlen = RECORD_SIZE * nrec;
 
-        buffer = calloc(1, rlen);
+        if ((buffer = calloc(1, rlen)) == NULL) {
+            return ENOMEM;
+        }
 
         /* one slurp - XXX TODO - mmap */
         if (read(cdb->fd, buffer, rlen) != rlen) {
@@ -776,7 +803,7 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
             return 0;
         }
 
-        nrecs = nrec;
+        *num_recs = nrec;
 
     } else {
 
@@ -787,7 +814,9 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
         uint64_t rlen1 = RECORD_SIZE * nrec1;
         uint64_t rlen2 = RECORD_SIZE * nrec2;
 
-        buffer = calloc(1, rlen1 + rlen2);
+        if ((buffer = calloc(1, rlen1 + rlen2)) == NULL) {
+            return ENOMEM;
+        }
 
         if (read(cdb->fd, buffer, rlen1) != rlen1) {
             free(buffer);
@@ -799,7 +828,7 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
             return 0;
         }
 
-        nrecs = nrec1 + nrec2;
+        *num_recs = nrec1 + nrec2;
     }
 
     /* Deal with cooking the output */
@@ -807,23 +836,26 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
 
         int is_counter = 0;
         //int check_min_max = 0;
+        long factor = 0;
         uint64_t i = 0;
         uint64_t cooked_recs = 0;
         double prev_value = 0.0;
         time_t prev_date  = 0;
-        
-        cdb_record_t *crecords = calloc(nrecs, RECORD_SIZE);
+        cdb_record_t *crecords;
 
-        int factor = _compute_scale_factor_and_num_records(cdb, &num_requested);
+        if ((crecords = calloc(*num_recs, RECORD_SIZE)) == NULL) {
+            return ENOMEM;
+        }
 
-        *first_time = buffer[0].time;
-        *last_time  = buffer[nrecs - 1].time;
+        if (_compute_scale_factor_and_num_records(cdb, &num_requested, &factor)) {
+            return errno;
+        }
 
         if (strcmp(cdb->header->type, "counter") == 0) {
             is_counter = 1;
         }
 
-        for (i = 0; i < nrecs; i++) {
+        for (i = 0; i < *num_recs; i++) {
 
             time_t date  = buffer[i].time;
             double value = buffer[i].value;
@@ -879,24 +911,26 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
         /* Now swap our cooked records for the buffer, so we can slice it as needed. */
         free(buffer);
         buffer = crecords;
-        nrecs  = cooked_recs;
+        *num_recs = cooked_recs;
     }
 
     /* now pull out the number of requested records if asked */
-    if (num_requested != 0 && nrecs >= abs(num_requested)) {
+    if (num_requested != 0 && *num_recs >= abs(num_requested)) {
 
         uint64_t start_index = 0;
 
         if (num_requested <= 0) {
 
-            start_index = nrecs - abs(num_requested);
+            start_index = *num_recs - abs(num_requested);
         }
 
-        nrecs = abs(num_requested);
+        *num_recs = abs(num_requested);
 
-        *records = calloc(nrecs, RECORD_SIZE);
+        if ((*records  = calloc(*num_recs, RECORD_SIZE)) == NULL) {
+            return ENOMEM;
+        }
 
-        memcpy(*records, &buffer[start_index], RECORD_SIZE * nrecs);
+        memcpy(*records, &buffer[start_index], RECORD_SIZE * *num_recs);
 
         free(buffer);
 
@@ -905,35 +939,34 @@ uint64_t _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_req
         *records = buffer;
     }
 
-    return nrecs;
+    return 0;
 }
 
-uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, 
-    int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records, cdb_range_t *range) {
+int cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, 
+    int cooked, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range) {
 
-    uint64_t num_recs = 0;
+    if (_cdb_read_records(cdb, start, end, num_requested, cooked, num_recs, records) == 0) {
 
-    num_recs = _cdb_read_records(cdb, start, end, num_requested, cooked, first_time, last_time, records);
+        if (*num_recs > 0) {
+            range->start_time = start;
+            range->end_time = end;
 
-    if (range != 0 && num_recs > 0) {
-        range->start_time = start;
-        range->end_time = end;
-
-        _compute_statistics(range, num_recs, *records);
+            _compute_statistics(range, num_recs, *records);
+        }
     }
 
-    return num_recs;
+    return 0;
 }
 
 void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, FILE *fh, 
-    const char *date_format, int cooked, time_t *first_time, time_t *last_time) {
+    const char *date_format, int cooked) {
 
     uint64_t i = 0;
     uint64_t num_recs = 0;
     
     cdb_record_t *records = NULL;
 
-    num_recs = _cdb_read_records(cdb, start, end, num_requested, cooked, first_time, last_time, &records);
+    _cdb_read_records(cdb, start, end, num_requested, cooked, &num_recs, &records);
 
     for (i = 0; i < num_recs; i++) {
 
@@ -946,7 +979,6 @@ void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_request
 void cdb_print(cdb_t *cdb) {
 
     const char *date_format = "%Y-%m-%d %H:%M:%S";
-    time_t first_time, last_time;
 
     printf("============== Header ================\n");
 
@@ -955,49 +987,51 @@ void cdb_print(cdb_t *cdb) {
     }
 
     printf("============== Records ================\n");
-    cdb_print_records(cdb, 0, 0, 0, stdout, date_format, 0, &first_time, &last_time);
+    cdb_print_records(cdb, 0, 0, 0, stdout, date_format, 0);
     printf("============== End ================\n");
 
     printf("============== Cooked Records ================\n");
-    cdb_print_records(cdb, 0, 0, 0, stdout, date_format, 1, &first_time, &last_time);
+    cdb_print_records(cdb, 0, 0, 0, stdout, date_format, 1);
     printf("============== End ================\n");
 }
 
 /* Take in an array of cdbs */
-uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
-    int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records, cdb_range_t *range) {
+int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
+    int cooked, uint64_t *driver_num_recs, cdb_record_t **records, cdb_range_t *range) {
 
     uint64_t i = 0;
-    uint64_t driver_num_recs = 0;
     cdb_record_t *driver_records = NULL;
+    *driver_num_recs = 0;
 
     assert(cdbs[0]);
 
     /* The first cdb is the driver */
-    driver_num_recs = _cdb_read_records(cdbs[0], start, end, num_requested, cooked, first_time, last_time, &driver_records);
+    _cdb_read_records(cdbs[0], start, end, num_requested, cooked, driver_num_recs, &driver_records);
 
-    assert(driver_num_recs > 1);
+    assert(*driver_num_recs > 1);
 
-    double *driver_x_values   = calloc(driver_num_recs, sizeof(double));
-    double *driver_y_values   = calloc(driver_num_recs, sizeof(double));
-    double *follower_x_values = calloc(driver_num_recs, sizeof(double));
-    double *follower_y_values = calloc(driver_num_recs, sizeof(double));
+    double *driver_x_values   = calloc(*driver_num_recs, sizeof(double));
+    double *driver_y_values   = calloc(*driver_num_recs, sizeof(double));
+    double *follower_x_values = calloc(*driver_num_recs, sizeof(double));
+    double *follower_y_values = calloc(*driver_num_recs, sizeof(double));
 
-    *records = calloc(driver_num_recs, RECORD_SIZE);
+    if ((*records = calloc(*driver_num_recs, RECORD_SIZE)) == NULL) {
+        return ENOMEM;
+    }
 
-    for (i = 0; i < driver_num_recs; i++) {
+    for (i = 0; i < *driver_num_recs; i++) {
         (*records)[i].time  = driver_x_values[i] = driver_records[i].time;
         (*records)[i].value = driver_y_values[i] = driver_records[i].value;
     }
 
     /* initialize and allocate the gsl objects  */
     gsl_interp_accel *accel = gsl_interp_accel_alloc();
-    gsl_interp *interp = gsl_interp_alloc(gsl_interp_linear, driver_num_recs);
+    gsl_interp *interp = gsl_interp_alloc(gsl_interp_linear, *driver_num_recs);
 
     /* Allows 0.0 to be returned as a valid yi */
     gsl_set_error_handler_off();
 
-    gsl_interp_init(interp, driver_x_values, driver_y_values, driver_num_recs);
+    gsl_interp_init(interp, driver_x_values, driver_y_values, *driver_num_recs);
 
     for (i = 1; i < num_cdbs; i++) {
 
@@ -1007,18 +1041,18 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
         cdb_record_t *follower_records = NULL;
 
         /* follower can't have more records than the driver */
-        assert(driver_num_recs <= cdbs[i]->header->num_records);
+        assert(*driver_num_recs <= cdbs[i]->header->num_records);
 
-        follower_num_recs = _cdb_read_records(cdbs[i], start, end, num_requested, cooked, first_time, last_time, &follower_records);
+        _cdb_read_records(cdbs[i], start, end, num_requested, cooked, &follower_num_recs, &follower_records);
 
         assert(follower_num_recs > 1);
 
-        for (j = 0; j < driver_num_recs; j++) {
+        for (j = 0; j < *driver_num_recs; j++) {
             follower_x_values[j] = follower_records[j].time;
             follower_y_values[j] = follower_records[j].value;
         }
 
-        for (j = 0; j < driver_num_recs; j++) {
+        for (j = 0; j < *driver_num_recs; j++) {
 
             double yi = gsl_interp_eval(interp, follower_x_values, follower_y_values, driver_x_values[j], accel);
 
@@ -1030,7 +1064,7 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
         free(follower_records);
     }
 
-    if (range != NULL) {
+    if (range) {
         /* Compute all the statistics for this range */
         range->start_time = start;
         range->end_time = end;
@@ -1047,18 +1081,18 @@ uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, ti
     gsl_interp_accel_free(accel);
     free(driver_records);
 
-    return driver_num_recs;
+    return 0;
 }
 
 void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
-    FILE *fh, const char *date_format, int cooked, time_t *first_time, time_t *last_time) {
+    FILE *fh, const char *date_format, int cooked) {
 
     uint64_t i = 0;
     uint64_t num_recs = 0;
  
     cdb_record_t *records = NULL;
 
-    num_recs = cdb_read_aggregate_records(cdbs, num_cdbs, start, end, num_requested, cooked, first_time, last_time, &records, NULL);
+    cdb_read_aggregate_records(cdbs, num_cdbs, start, end, num_requested, cooked, &num_recs, &records, NULL);
 
     for (i = 0; i < num_recs; i++) {
 
@@ -1110,7 +1144,7 @@ cdb_t* cdb_new(void) {
     cdb->header = calloc(1, HEADER_SIZE);
 
     cdb->fd = -1;
-    cdb->synced = 0;
+    cdb->synced = false;
     cdb->flags = -1;
     cdb->mode = -1;
 

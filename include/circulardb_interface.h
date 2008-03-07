@@ -53,7 +53,7 @@ typedef struct cdb_s {
     int fd;
     int flags;
     int mode;
-    short synced;
+    bool synced;
     char *filename;
     cdb_header_t *header;
 } cdb_t;
@@ -100,33 +100,33 @@ void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, char* typ
 int cdb_read_header(cdb_t *cdb);
 int cdb_write_header(cdb_t *cdb);
 
-uint64_t cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len);
+int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t *num_recs);
 bool cdb_write_record(cdb_t *cdb, time_t time, double value);
 
 /* Update particular record(s) in the DB after they have already been written. */
-uint64_t cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len);
+int cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t *num_recs);
 bool cdb_update_record(cdb_t *cdb, time_t time, double value);
 
-uint64_t cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end);
+int cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end, uint64_t *num_recs);
 
 double cdb_get_statistic(cdb_range_t *range, cdb_statistics_enum_t type);
 
-uint64_t cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested,
-    int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records, cdb_range_t *range);
+int cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested,
+    int cooked, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range);
 
 void cdb_print_header(cdb_t * cdb);
 
 void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, FILE *fh, 
-    const char *date_format, int cooked, time_t *first_time, time_t *last_time);
+    const char *date_format, int cooked);
 
 void cdb_print(cdb_t *cdb);
 
 /* Aggregation interface */
-uint64_t cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
-    int cooked, time_t *first_time, time_t *last_time, cdb_record_t **records, cdb_range_t *range);
+int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
+    int cooked, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range);
 
 void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
-    FILE *fh, const char *date_format, int cooked, time_t *first_time, time_t *last_time);
+    FILE *fh, const char *date_format, int cooked);
 
 #endif
 
