@@ -953,7 +953,11 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
 int cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, 
     int cooked, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range) {
 
-    if (_cdb_read_records(cdb, start, end, num_requested, cooked, num_recs, records) == 0) {
+    int ret = 0;
+
+    ret = _cdb_read_records(cdb, start, end, num_requested, cooked, num_recs, records);
+
+    if (ret == 0) {
 
         if (*num_recs > 0) {
             range->start_time = start;
@@ -963,7 +967,7 @@ int cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested
         }
     }
 
-    return 0;
+    return ret;
 }
 
 void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, FILE *fh, 
@@ -1008,13 +1012,16 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
     int cooked, uint64_t *driver_num_recs, cdb_record_t **records, cdb_range_t *range) {
 
     uint64_t i = 0;
+    int ret = 0;
     cdb_record_t *driver_records = NULL;
     *driver_num_recs = 0;
 
     assert(cdbs[0]);
 
     /* The first cdb is the driver */
-    _cdb_read_records(cdbs[0], start, end, num_requested, cooked, driver_num_recs, &driver_records);
+    ret = _cdb_read_records(cdbs[0], start, end, num_requested, cooked, driver_num_recs, &driver_records);
+
+    if (!ret) return ret;
 
     assert(*driver_num_recs > 1);
 
@@ -1051,7 +1058,9 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
         /* follower can't have more records than the driver */
         assert(*driver_num_recs <= cdbs[i]->header->num_records);
 
-        _cdb_read_records(cdbs[i], start, end, num_requested, cooked, &follower_num_recs, &follower_records);
+        ret = _cdb_read_records(cdbs[i], start, end, num_requested, cooked, &follower_num_recs, &follower_records);
+
+        if (!ret) return ret;
 
         assert(follower_num_recs > 1);
 
@@ -1072,7 +1081,7 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
         free(follower_records);
     }
 
-    if (range) {
+    if (driver_num_recs > 0) {
         /* Compute all the statistics for this range */
         range->start_time = start;
         range->end_time = end;
@@ -1144,6 +1153,8 @@ void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, char* typ
     cdb->header->max_records = max_records;
     cdb->header->num_records = 0;
     cdb->header->start_record = 0;
+    //cdb->header->min_value = CDB_NAN;
+    //cdb->header->max_value = CDB_NAN;
 }
 
 cdb_t* cdb_new(void) {
@@ -1196,13 +1207,10 @@ int cdb_close(cdb_t *cdb) {
         }
 
         if (cdb->fd > 0) {
-
-            if (close(cdb->fd) == 0) {
+            if (close(cdb->fd) != 0) {
                 cdb->fd = -1;
-                return 0;
+                return errno;
             }
-
-            return errno;
         }
     }
 
