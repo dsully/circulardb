@@ -1017,7 +1017,7 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
     /* The first cdb is the driver */
     ret = _cdb_read_records(cdbs[0], start, end, num_requested, cooked, driver_num_recs, &driver_records);
 
-    if (!ret) {
+    if (ret != CDB_SUCCESS) {
         free(driver_records);
         return ret;
     }
@@ -1029,7 +1029,7 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
 
     if (*driver_num_recs <= 1) {
         free(driver_records);
-        ret = CDB_EINTERPD;
+        return CDB_EINTERPD;
     }
 
     double *driver_x_values   = calloc(*driver_num_recs, sizeof(double));
@@ -1059,7 +1059,7 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
         cdb_record_t *follower_records = NULL;
 
         /* follower can't have more records than the driver */
-        if (*driver_num_recs <= cdbs[i]->header->num_records) {
+        if (*driver_num_recs < cdbs[i]->header->num_records) {
             ret = CDB_EINTERPF;
             break;
         }
@@ -1091,7 +1091,7 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
         free(follower_records);
     }
 
-    if (ret == 0 && driver_num_recs > 0) {
+    if (ret == CDB_SUCCESS && *driver_num_recs > 0) {
         /* Compute all the statistics for this range */
         range->start_time = start;
         range->end_time = end;
@@ -1220,9 +1220,9 @@ int cdb_close(cdb_t *cdb) {
 
         if (cdb->fd > 0) {
             if (close(cdb->fd) != 0) {
-                cdb->fd = -1;
                 return cdb_error();
             }
+            cdb->fd = -1;
         }
     }
 
