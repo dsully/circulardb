@@ -52,8 +52,8 @@ module CircularDB
       self.cdbs         = cdbs
 
       self.style        = "lines"
-      self.show_data    = 1
-      self.show_trend   = 0
+      self.show_data    = true
+      self.show_trend   = false
       self.fix_logscale = 0.0000001
 
       # Keep this around until the program ends.
@@ -126,6 +126,8 @@ module CircularDB
         if ext == ".svg" 
            self.output_format = "svg"
         end
+
+        @tmpfile = nil
       else
         # output is nil. because gnuplot is kinda lame, create a temporary file.
         @tmpfile = Tempfile.new('gnuplot')
@@ -192,7 +194,7 @@ module CircularDB
       end
 
       # Debug gnuplot scripts with:
-      #File.open("/tmp/out.gplot", "w+") do |gp|
+      #File.open("/tmp/out.gplot", "a+") do |gp|
  
       Gnuplot.open do |gp|
         Gnuplot::Plot.new(gp) do |plot|
@@ -219,9 +221,16 @@ module CircularDB
           debug = false
           @cdbs.keys.sort.each do |name|
 
-            cdb = @cdbs[name]
-
-            records    = cdb.read_records(@start_time, @end_time, nil, for_graphing)
+            cdb     = @cdbs[name]
+            records = []
+      
+            begin
+              records = cdb.read_records(@start_time, @end_time, nil, for_graphing)
+            rescue Exception => e
+              puts "#{cdb.filename}: #{e} - trying to continue"
+              plots -= 1
+              next
+            end
 
             if records.empty? or records.first.nil?
               puts "Busted read_records for: #{cdb.filename}"
@@ -344,7 +353,7 @@ module CircularDB
                 ds.title = name.gsub(/_/, '/')
                 ds.with  = "#{@style} lw 2 lt #{styles[num_plots]}"
 
-                if @show_data and @show_trend == 0
+                if @show_data and @show_trend == false
                   ds.using = "1:#{yaxis} axes #{axis}"
                 elsif @show_trend
                   ds.using = "1:#{yaxis} smooth bezier axes #{axis}"
@@ -459,40 +468,6 @@ module CircularDB
       @cdbs = nil
     end
 
-  end
-end
-
-# Replace to have sets be a Hash instead of an Array.
-module Gnuplot
-  class Plot
-
-    def initialize (io = nil, cmd = "plot")
-      @cmd = cmd
-      @sets = {}
-      @data = []
-      yield self if block_given?
-
-      io << to_gplot if io
-    end
-
-    def set ( var, value = "" )
-      value = "'#{value}'" if QUOTED.include? var unless value =~ /^'.*'$/
-      @sets[var] = value
-    end
-
-    def to_gplot (io = "")
-      @sets.each_pair { |var, val| io << "set #{var} #{val}\n" }
-
-      if @data.size > 0 then
-        io << @cmd << " " << @data.collect { |e| e.plot_args }.join(", ")
-        io << "\n"
-
-        v = @data.collect { |ds| ds.to_gplot }
-        io << v.compact.join("e\n")
-      end
-
-      io
-    end
   end
 end
 

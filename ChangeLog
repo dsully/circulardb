@@ -1,3 +1,10 @@
+Version 0.1.11 (dan)
+	* Fix graph y format - go back to array based gnuplot sets.
+
+Version 0.1.10 (dan)
+	* Meta methods for header setter and getter - missed from [PLATFORM-227]
+	* Update to match CircularDB API - handle return values / exceptions better.
+
 Version 0.1.9 (dan)
 	* Add reset test.
 	* Allow arbitrary graph sizes [PLATFORM-226]

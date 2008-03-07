@@ -97,7 +97,7 @@ class TestCircularDB < Test::Unit::TestCase
 
     assert_equal(5, cdb.write_records(records))
 
-    read = cdb.read_records
+    read = cdb.read_records(0, 0, 0, 1)
 
     assert_equal(10, read[0][1])
     assert_equal(1, read[1][1])

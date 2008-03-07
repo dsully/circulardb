@@ -26,6 +26,20 @@ void print_class(char* token, VALUE obj) {
     fprintf(stderr, "token: [%s] id: [%s]\n", token, StringValuePtr(class));
 }
 
+void _check_return(int ret) {
+
+    switch (ret) {
+        case CDB_SUCCESS : break;
+        case CDB_ETMRANGE: rb_raise(rb_eArgError, "End time must be >= Start time.");
+        case CDB_ESANITY : rb_raise(rb_eStandardError, "Database is unsynced.");
+        case CDB_ENOMEM  : rb_raise(rb_eNoMemError, "No memory could be allocated.");
+        case CDB_ENORECS : rb_raise(rb_eRangeError, "There were no records in the database to be read.");
+        case CDB_EINTERPD: rb_raise(rb_eRuntimeError, "Aggregate driver issue. Possibly no records!");
+        case CDB_EINTERPF: rb_raise(rb_eRuntimeError, "Aggregate follower issue. Possibly no records!");
+        default          : rb_raise(rb_eSystemCallError, "Errno: (%d) %s", errno, strerror(errno));
+    }
+}
+
 /* Cleanup after an object has been GCed */
 static void cdb_rb_free(void *p) {
     cdb_free(p);
@@ -110,31 +124,21 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
         }
     }
 
-    cdb->filename = StringValuePtr(filename);
-
     rb_hash_aset(header, ID2SYM(rb_intern("filename")), filename);
 
-    if (NIL_P(flags)) {
-        cdb->flags = -1;
-    } else {
-        cdb->flags = NUM2INT(flags);
-    }
-
-    if (NIL_P(mode)) {
-        cdb->mode = -1;
-    } else {
-        cdb->mode = NUM2INT(mode);
-    }
+    cdb->filename = StringValuePtr(filename);
+    cdb->flags    = NIL_P(flags) ? -1 : NUM2INT(flags);
+    cdb->mode     = NIL_P(mode)  ? -1 : NUM2INT(mode);
 
     /* Try the open */
-    if (cdb_open(cdb) > 0) {
+    if (cdb_open(cdb) != CDB_SUCCESS) {
         rb_raise(rb_eIOError, strerror(errno));
     }
 
     /* Try and read a header, if it doesn't exist, create one */
     if (NIL_P(name)) {
 
-        if (cdb_read_header(cdb) > 0) {
+        if (cdb_read_header(cdb) != CDB_SUCCESS) {
             rb_raise(rb_eIOError, strerror(errno));
         }
 
@@ -163,7 +167,7 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
 
         num_records = INT2FIX(0);
 
-        if (cdb_write_header(cdb) > 0) {
+        if (cdb_write_header(cdb) != CDB_SUCCESS) {
             rb_raise(rb_eIOError, strerror(errno));
         }
     }
@@ -196,13 +200,19 @@ static VALUE _set_header(VALUE self, VALUE name, VALUE value) {
 
         rb_hash_aset(header, ID2SYM(rb_intern("description")), value);
         strncpy(cdb->header->description, StringValuePtr(value), sizeof(cdb->header->description));
-        cdb->synced = 0;
+        cdb->synced = false;
+
+    } else if (strcmp(StringValuePtr(name), "name") == 0) {
+
+        rb_hash_aset(header, ID2SYM(rb_intern("name")), value);
+        strncpy(cdb->header->name, StringValuePtr(value), sizeof(cdb->header->name));
+        cdb->synced = false;
 
     } else if (strcmp(StringValuePtr(name), "units") == 0) {
 
         rb_hash_aset(header, ID2SYM(rb_intern("units")), value);
         strncpy(cdb->header->units, StringValuePtr(value), sizeof(cdb->header->units));
-        cdb->synced = 0;
+        cdb->synced = false;
     }
 
     return value;
@@ -214,7 +224,7 @@ static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
 
     uint64_t i   = 0;
     uint64_t cnt = 0;
-    time_t first_time, last_time;
+    int      ret = 0;
 
     cdb_t *cdb;
     cdb_range_t *range    = _new_statistics(self);
@@ -225,24 +235,22 @@ static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
     if (NIL_P(start))   start   = INT2FIX(0);
     if (NIL_P(end))     end     = INT2FIX(0);
     if (NIL_P(num_req)) num_req = INT2FIX(0);
-    if (NIL_P(cooked))   cooked = INT2FIX(0);
+    if (NIL_P(cooked))  cooked  = INT2FIX(0);
 
     Data_Get_Struct(self, cdb_t, cdb);
 
-    cdb_read_records(cdb,
+    ret = cdb_read_records(
+        cdb,
         NUM2UINT(start),
         NUM2UINT(end),
         rb_num2ull(num_req),
-        cooked,
+        NUM2UINT(cooked),
         &cnt,
         &records,
         range
     );
 
-    switch (cnt) {
-        case -1: rb_raise(rb_eStandardError, "End time must be >= Start time.");
-        case -2: rb_raise(rb_eStandardError, "Database is unsynced.");
-    }
+    _check_return(ret);
 
     array = rb_ary_new2(cnt);
 
@@ -272,6 +280,7 @@ static VALUE _cdb_write_or_update_records(VALUE self, VALUE array, int type) {
     uint64_t len = RARRAY(array)->len;
     uint64_t i   = 0;
     uint64_t cnt = 0;
+    bool     ret = false;
 
     cdb_t *cdb;
     cdb_record_t *records = ALLOCA_N(cdb_record_t, len);
@@ -288,13 +297,13 @@ static VALUE _cdb_write_or_update_records(VALUE self, VALUE array, int type) {
     }
 
     if (type == 1) {
-        cdb_write_records(cdb, records, len, &cnt);
+        ret = cdb_write_records(cdb, records, len, &cnt);
     } else {
-        cdb_update_records(cdb, records, len, &cnt);
+        ret = cdb_update_records(cdb, records, len, &cnt);
     }
 
-    if (cnt == 0) {
-        rb_raise(rb_eIOError, strerror(errno));
+    if (ret != CDB_SUCCESS) {
+        rb_raise(rb_eStandardError, strerror(errno));
     }
 
     _cdb_rb_update_header_hash(self, cdb);
@@ -304,7 +313,7 @@ static VALUE _cdb_write_or_update_records(VALUE self, VALUE array, int type) {
 
 static VALUE _cdb_write_or_update_record(VALUE self, VALUE time, VALUE value, int type) {
 
-    uint64_t cnt = 0;
+    bool ret = false;
 
     cdb_t *cdb;
 
@@ -316,18 +325,18 @@ static VALUE _cdb_write_or_update_record(VALUE self, VALUE time, VALUE value, in
     }
 
     if (type == 1) {
-        cnt = cdb_write_record(cdb, _parse_time(time), NUM2DBL(value));
+        ret = cdb_write_record(cdb, _parse_time(time), NUM2DBL(value));
     } else {
-        cnt = cdb_update_record(cdb, _parse_time(time), NUM2DBL(value));
+        ret = cdb_update_record(cdb, _parse_time(time), NUM2DBL(value));
     }
 
-    if (cnt == 0) {
-        rb_raise(rb_eIOError, strerror(errno));
+    if (ret == false) {
+        rb_raise(rb_eStandardError, strerror(errno));
     }
 
     _cdb_rb_update_header_hash(self, cdb);
 
-    return ULL2NUM(cnt);
+    return ULL2NUM((int)ret);
 }
 
 static VALUE cdb_rb_write_records(VALUE self, VALUE array) {
@@ -356,7 +365,9 @@ static VALUE cdb_rb_discard_records_in_time_range(VALUE self, VALUE start_time, 
     Data_Get_Struct(self, cdb_t, cdb);
     uint64_t cnt = 0;
 
-    cdb_discard_records_in_time_range(cdb, NUM2ULONG(start_time), NUM2ULONG(end_time), &cnt);
+    int ret = cdb_discard_records_in_time_range(cdb, NUM2ULONG(start_time), NUM2ULONG(end_time), &cnt);
+
+    _check_return(ret);
 
     return ULL2NUM(cnt);
 }
@@ -366,7 +377,7 @@ static VALUE cdb_rb_open_cdb(VALUE self) {
     cdb_t *cdb;
     Data_Get_Struct(self, cdb_t, cdb);
 
-    if (cdb_open(cdb) > 0) {
+    if (cdb_open(cdb) != CDB_SUCCESS) {
         rb_raise(rb_eIOError, strerror(errno));
     }
 
@@ -378,7 +389,7 @@ static VALUE cdb_rb_close_cdb(VALUE self) {
     cdb_t *cdb;
     Data_Get_Struct(self, cdb_t, cdb);
 
-    if (cdb_close(cdb) > 0) {
+    if (cdb_close(cdb) != CDB_SUCCESS) {
         rb_raise(rb_eIOError, strerror(errno));
     }
 
@@ -390,7 +401,7 @@ static VALUE cdb_rb_read_header(VALUE self) {
     cdb_t *cdb;
     Data_Get_Struct(self, cdb_t, cdb);
 
-    if (cdb_read_header(cdb) > 0) {
+    if (cdb_read_header(cdb) != CDB_SUCCESS) {
         rb_raise(rb_eIOError, strerror(errno));
     }
 
@@ -404,7 +415,7 @@ static VALUE cdb_rb_write_header(VALUE self) {
     cdb_t *cdb;
     Data_Get_Struct(self, cdb_t, cdb);
 
-    if (cdb_write_header(cdb) > 0) {
+    if (cdb_write_header(cdb) != CDB_SUCCESS) {
         rb_raise(rb_eIOError, strerror(errno));
     }
 
@@ -495,6 +506,7 @@ static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
 
     uint64_t i   = 0;
     uint64_t cnt = 0;
+    int ret      = 0;
     int num_cdbs = RARRAY(cdb_objects)->len;
 
     /* initialize the cdbs array to the size of the cdb_objects array */
@@ -515,7 +527,7 @@ static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
         Data_Get_Struct(RARRAY(cdb_objects)->ptr[i], cdb_t, cdbs[i]);
     }
 
-    cdb_read_aggregate_records(
+    ret = cdb_read_aggregate_records(
         cdbs,
         num_cdbs,
         NUM2UINT(start),
@@ -526,6 +538,8 @@ static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
         &records,
         range
     );
+
+    _check_return(ret);
 
     array = rb_ary_new2(cnt);
 
