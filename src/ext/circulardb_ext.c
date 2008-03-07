@@ -229,13 +229,12 @@ static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
 
     Data_Get_Struct(self, cdb_t, cdb);
 
-    cnt = cdb_read_records(cdb,
+    cdb_read_records(cdb,
         NUM2UINT(start),
         NUM2UINT(end),
         rb_num2ull(num_req),
         cooked,
-        &first_time,
-        &last_time,
+        &cnt,
         &records,
         range
     );
@@ -289,9 +288,9 @@ static VALUE _cdb_write_or_update_records(VALUE self, VALUE array, int type) {
     }
 
     if (type == 1) {
-        cnt = cdb_write_records(cdb, records, len);
+        cdb_write_records(cdb, records, len, &cnt);
     } else {
-        cnt = cdb_update_records(cdb, records, len);
+        cdb_update_records(cdb, records, len, &cnt);
     }
 
     if (cnt == 0) {
@@ -355,8 +354,11 @@ static VALUE cdb_rb_discard_records_in_time_range(VALUE self, VALUE start_time, 
 
     cdb_t *cdb;
     Data_Get_Struct(self, cdb_t, cdb);
+    uint64_t cnt = 0;
 
-    return ULL2NUM(cdb_discard_records_in_time_range(cdb, NUM2ULONG(start_time), NUM2ULONG(end_time)));
+    cdb_discard_records_in_time_range(cdb, NUM2ULONG(start_time), NUM2ULONG(end_time), &cnt);
+
+    return ULL2NUM(cnt);
 }
 
 static VALUE cdb_rb_open_cdb(VALUE self) {
@@ -431,8 +433,7 @@ static VALUE cdb_rb_print_header(VALUE self) {
 
 static VALUE cdb_rb_print_records(int argc, VALUE *argv, VALUE self) {
 
-    VALUE start, end, num_req, file_obj, date_format, cooked, array;
-    time_t first_time, last_time;
+    VALUE start, end, num_req, file_obj, date_format, cooked;
     cdb_t *cdb;
 
     rb_scan_args(argc, argv, "06", &start, &end, &num_req, &file_obj, &date_format, &cooked);
@@ -459,16 +460,8 @@ static VALUE cdb_rb_print_records(int argc, VALUE *argv, VALUE self) {
         rb_num2ull(num_req),
         RFILE(file_obj)->fptr->f,
         StringValuePtr(date_format),
-        NUM2UINT(cooked),
-        &first_time,
-        &last_time
+        NUM2UINT(cooked)
     );
-
-    array = rb_ary_new2(2);
-    rb_ary_store(array, 0, UINT2NUM(first_time));
-    rb_ary_store(array, 1, UINT2NUM(last_time));
-
-    return array;
 }
 
 static VALUE cdb_rb_statistics(int argc, VALUE *argv, VALUE self) {
@@ -508,7 +501,6 @@ static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
     cdb_t *cdbs[num_cdbs];
     cdb_record_t *records = NULL;
     cdb_range_t *range    = _new_statistics(self);
-    time_t first_time, last_time;
 
     rb_scan_args(argc, argv, "04", &start, &end, &num_req, &cooked);
 
@@ -523,15 +515,14 @@ static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
         Data_Get_Struct(RARRAY(cdb_objects)->ptr[i], cdb_t, cdbs[i]);
     }
 
-    cnt = cdb_read_aggregate_records(
+    cdb_read_aggregate_records(
         cdbs,
         num_cdbs,
         NUM2UINT(start),
         NUM2UINT(end),
         rb_num2ull(num_req),
         NUM2UINT(cooked),
-        &first_time,
-        &last_time,
+        &cnt,
         &records,
         range
     );
@@ -549,7 +540,7 @@ static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
 
 static VALUE cdb_agg_rb_print_records(int argc, VALUE *argv, VALUE self) {
 
-    VALUE start, end, num_req, file_obj, date_format, cooked, array;
+    VALUE start, end, num_req, file_obj, date_format, cooked;
     VALUE cdb_objects = rb_iv_get(self, "@cdbs");
 
     uint64_t i   = 0;
@@ -557,7 +548,6 @@ static VALUE cdb_agg_rb_print_records(int argc, VALUE *argv, VALUE self) {
 
     /* initialize the cdbs array to the size of the cdb_objects array */
     cdb_t *cdbs[num_cdbs];
-    time_t first_time, last_time;
 
     rb_scan_args(argc, argv, "06", &start, &end, &num_req, &file_obj, &date_format, &cooked);
 
@@ -588,16 +578,8 @@ static VALUE cdb_agg_rb_print_records(int argc, VALUE *argv, VALUE self) {
         rb_num2ull(num_req),
         RFILE(file_obj)->fptr->f,
         StringValuePtr(date_format),
-        NUM2UINT(cooked),
-        &first_time,
-        &last_time
+        NUM2UINT(cooked)
     );
-
-    array = rb_ary_new2(2);
-    rb_ary_store(array, 0, UINT2NUM(first_time));
-    rb_ary_store(array, 1, UINT2NUM(last_time));
-
-    return array;
 }
 
 static VALUE cdb_agg_rb_statistics(int argc, VALUE *argv, VALUE self) {
