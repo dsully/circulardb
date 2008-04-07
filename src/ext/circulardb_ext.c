@@ -36,7 +36,7 @@ void _check_return(int ret) {
         case CDB_ENORECS : rb_raise(rb_eRangeError, "There were no records in the database to be read.");
         case CDB_EINTERPD: rb_raise(rb_eRuntimeError, "Aggregate driver issue. Possibly no records!");
         case CDB_EINTERPF: rb_raise(rb_eRuntimeError, "Aggregate follower issue. Possibly no records!");
-        default          : rb_raise(rb_eSystemCallError, "Errno: (%d) %s", errno, strerror(errno));
+        default          : rb_sys_fail(0);
     }
 }
 
@@ -111,19 +111,6 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
 
     Data_Get_Struct(self, cdb_t, cdb);
 
-    /* Add the default extension if it doesn't exist. */
-    if (sprintf(regex, "\\.%s", CDB_EXTENSION)) {
-
-        VALUE re = rb_reg_new(regex, strlen(regex), 0);
-
-        if (!RTEST(rb_reg_match(re, filename))) {
-
-            /* lazy */
-            filename = rb_str_cat2(filename, ".");
-            filename = rb_str_cat2(filename, CDB_EXTENSION);
-        }
-    }
-
     rb_hash_aset(header, ID2SYM(rb_intern("filename")), filename);
 
     cdb->filename = StringValuePtr(filename);
@@ -132,14 +119,14 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
 
     /* Try the open */
     if (cdb_open(cdb) != CDB_SUCCESS) {
-        rb_raise(rb_eIOError, strerror(errno));
+        rb_sys_fail(0);
     }
 
     /* Try and read a header, if it doesn't exist, create one */
     if (NIL_P(name)) {
 
         if (cdb_read_header(cdb) != CDB_SUCCESS) {
-            rb_raise(rb_eIOError, strerror(errno));
+            rb_sys_fail(0);
         }
 
         name         = rb_str_new2(cdb->header->name);
@@ -168,7 +155,7 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
         num_records = INT2FIX(0);
 
         if (cdb_write_header(cdb) != CDB_SUCCESS) {
-            rb_raise(rb_eIOError, strerror(errno));
+            rb_sys_fail(0);
         }
     }
 
@@ -303,7 +290,7 @@ static VALUE _cdb_write_or_update_records(VALUE self, VALUE array, int type) {
     }
 
     if (ret != CDB_SUCCESS) {
-        rb_raise(rb_eStandardError, strerror(errno));
+        rb_sys_fail(0);
     }
 
     _cdb_rb_update_header_hash(self, cdb);
@@ -331,7 +318,7 @@ static VALUE _cdb_write_or_update_record(VALUE self, VALUE time, VALUE value, in
     }
 
     if (ret == false) {
-        rb_raise(rb_eStandardError, strerror(errno));
+        rb_sys_fail(0);
     }
 
     _cdb_rb_update_header_hash(self, cdb);
@@ -378,7 +365,7 @@ static VALUE cdb_rb_open_cdb(VALUE self) {
     Data_Get_Struct(self, cdb_t, cdb);
 
     if (cdb_open(cdb) != CDB_SUCCESS) {
-        rb_raise(rb_eIOError, strerror(errno));
+        rb_sys_fail(0);
     }
 
     return self;
@@ -390,7 +377,7 @@ static VALUE cdb_rb_close_cdb(VALUE self) {
     Data_Get_Struct(self, cdb_t, cdb);
 
     if (cdb_close(cdb) != CDB_SUCCESS) {
-        rb_raise(rb_eIOError, strerror(errno));
+        rb_sys_fail(0);
     }
 
     return self;
@@ -402,7 +389,7 @@ static VALUE cdb_rb_read_header(VALUE self) {
     Data_Get_Struct(self, cdb_t, cdb);
 
     if (cdb_read_header(cdb) != CDB_SUCCESS) {
-        rb_raise(rb_eIOError, strerror(errno));
+        rb_sys_fail(0);
     }
 
     _cdb_rb_update_header_hash(self, cdb);
@@ -416,7 +403,7 @@ static VALUE cdb_rb_write_header(VALUE self) {
     Data_Get_Struct(self, cdb_t, cdb);
 
     if (cdb_write_header(cdb) != CDB_SUCCESS) {
-        rb_raise(rb_eIOError, strerror(errno));
+        rb_sys_fail(0);
     }
 
     return self;
