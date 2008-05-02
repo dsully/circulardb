@@ -69,13 +69,17 @@ module CircularDB
 
       cdbs.each_pair do |name,cdb|
 
-        if cdb.type == "counter"
-          name = "#{name} (#{cdb.units})"
-        end
+        #if cdb.type == "counter"
+        #  name = "#{name} (#{cdb.units})"
+        #end
 
         @cdbs[name] = cdb
 
       end
+    end
+
+    def add_cdbs=(cdbs)
+      add_cdbs(cdbs)
     end
 
     def cdbs=(cdbs)
@@ -227,7 +231,7 @@ module CircularDB
             begin
               records = cdb.read_records(@start_time, @end_time, nil, for_graphing)
             rescue Exception => e
-              puts "#{cdb.filename}: #{e} - trying to continue"
+              #puts "#{cdb.filename}: #{e} - trying to continue"
               plots -= 1
               next
             end
@@ -279,7 +283,7 @@ module CircularDB
               max = stats.max
 
               if min == max
-                range = "[-#{min-1.0}:#{max+1.0}]"
+                range = "[-#{min-1.1}:#{max+1.1}]"
 
                 if axis == 'x1y1'
                   plot.yrange range
@@ -334,23 +338,14 @@ module CircularDB
               x = []
               y = []
 
-              mad    = stats.mad
-              median = stats.median
-        
               records.each do |r|
-                # Rudimentary outlier rejection
-                # Zi = 0.6745 * abs(x - median) / MAD
-                #if ((0.6745 * (r[1] - median).abs) / mad) > 3.5
-                  #next
-                #end
-
                 x << r[0]
                 y << r[1] / div
               end
 
               plot.data << Gnuplot::DataSet.new([x, y]) do |ds|
 
-                ds.title = name.gsub(/_/, '/')
+                ds.title = name.gsub(/_/, '-')
                 ds.with  = "#{@style} lw 2 lt #{styles[num_plots]}"
 
                 if @show_data and @show_trend == false
@@ -409,6 +404,7 @@ module CircularDB
 
               if units =~ /percent/
                 plot.yrange "[0:100]"
+                plot.ylabel nil
               elsif units =~ /bytes|bits/
                 plot.yrange "[0:*]" unless total_sum == 0.0
               end
@@ -420,6 +416,7 @@ module CircularDB
 
               if units =~ /percent/
                 plot.y2range "[0:100]"
+                plot.ylabel nil
               elsif units =~ /bytes|bits/
                 plot.y2range "[0:*]" unless total_sum == 0.0
               end
@@ -431,8 +428,13 @@ module CircularDB
           plot.xrange "[\"#{x_start}\":\"#{x_end}\"]"
 
           # for plots longer than a quarter, skip day and hour information
-          if (x_end - x_start <= 30 * ONE_HOUR)
+          if (x_end - x_start <= 2 * ONE_HOUR)
+            plot.format "x \":%M\"" # hour
 
+          elsif (x_end - x_start <= 24 * ONE_HOUR)
+            plot.format "x \"%H\"" # day
+
+          elsif (x_end - x_start <= 30 * ONE_HOUR)
             plot.format "x \"%H:%M\\n%m/%d\"" # day
 
           elsif (x_end - x_start <= 9 * 24 * ONE_HOUR)

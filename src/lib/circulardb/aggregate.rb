@@ -44,6 +44,10 @@ module CircularDB
       @cdbs
     end
 
+    def reorder
+      @cdbs << @cdbs.shift
+    end
+
     def filename
       @cdbs[0].filename
     end

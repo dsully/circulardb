@@ -140,9 +140,15 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
     } else {
 
         if (NIL_P(max_records)) max_records = INT2FIX(0);
-        if (NIL_P(type))  type  = rb_str_new2(CDB_DEFAULT_DATA_TYPE);
-        if (NIL_P(units)) units = rb_str_new2(CDB_DEFAULT_DATA_UNIT);
         if (NIL_P(desc))  desc  = rb_str_new2("");
+
+        if (NIL_P(type) || (strcmp(StringValuePtr(type), "") == 0)) {
+            type  = rb_str_new2(CDB_DEFAULT_DATA_TYPE);
+        }
+
+        if (NIL_P(units) || (strcmp(StringValuePtr(units), "") == 0)) {
+            units = rb_str_new2(CDB_DEFAULT_DATA_UNIT);
+        }
 
         cdb_generate_header(cdb,
             StringValuePtr(name),

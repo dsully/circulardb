@@ -1,3 +1,8 @@
+Version 0.1.13 (dan)
+	* Fix potential crasher when an empty string (instead of nil) was passed.
+	* Update graph x-axis time auto-magic.
+	* Don't bother with y-label on percent graphs.
+
 Version 0.1.12 (dan)
 	* Don't require .cdb for filename.
 	* Raise Errno::* SystemCallErrors for errno failures.
