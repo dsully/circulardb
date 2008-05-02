@@ -1051,18 +1051,16 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
 
     gsl_interp_init(interp, driver_x_values, driver_y_values, *driver_num_recs);
 
+    /* restrict to the driver's time range */
+    if (start == 0) start = driver_records[0].time;
+    if (end   == 0) end   = driver_records[*driver_num_recs-1].time;
+
     for (i = 1; i < num_cdbs; i++) {
 
         uint64_t j = 0;
         uint64_t follower_num_recs = 0;
 
         cdb_record_t *follower_records = NULL;
-
-        /* follower can't have more records than the driver */
-        if (*driver_num_recs < cdbs[i]->header->num_records) {
-            ret = CDB_EINTERPF;
-            break;
-        }
 
         ret = _cdb_read_records(cdbs[i], start, end, num_requested, cooked, &follower_num_recs, &follower_records);
 
@@ -1118,14 +1116,16 @@ void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_
     uint64_t num_recs = 0;
  
     cdb_record_t *records = NULL;
+    cdb_range_t *range = calloc(1, sizeof(cdb_range_t));
 
-    cdb_read_aggregate_records(cdbs, num_cdbs, start, end, num_requested, cooked, &num_recs, &records, NULL);
+    cdb_read_aggregate_records(cdbs, num_cdbs, start, end, num_requested, cooked, &num_recs, &records, range);
 
     for (i = 0; i < num_recs; i++) {
 
         _print_record(fh, records[i].time, records[i].value, date_format);
     }
 
+    free(range);
     free(records);
 }
 
