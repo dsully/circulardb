@@ -1068,8 +1068,8 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
         if (ret != 0) break;
 
         if (follower_num_recs <= 1) {
-            ret = CDB_EINTERPF;
-            break;
+            //ret = CDB_EINTERPF;
+            continue;
         }
 
         for (j = 0; j < *driver_num_recs; j++) {
