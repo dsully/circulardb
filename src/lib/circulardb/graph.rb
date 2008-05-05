@@ -226,12 +226,23 @@ module CircularDB
           @cdbs.keys.sort.each do |name|
 
             cdb     = @cdbs[name]
+            retries = 0
             records = []
       
             begin
               records = cdb.read_records(@start_time, @end_time, nil, for_graphing)
+            rescue RuntimeError => e
+              if retries < 10 and cdb.respond_to?('reorder')
+                cdb.reorder
+                retries += 1
+                retry
+              else
+                puts "#{cdb.filename}: #{e} - trying to continue. Retried #{retries} times."
+                plots -= 1
+                next
+              end
             rescue Exception => e
-              #puts "#{cdb.filename}: #{e} - trying to continue"
+              puts "#{cdb.filename}: #{e} - trying to continue"
               plots -= 1
               next
             end

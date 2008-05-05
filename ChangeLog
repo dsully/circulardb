@@ -1,3 +1,6 @@
+Version 0.1.14 (dan)
+	* Try and reorder Aggregate DBs if the driver is bunk.
+
 Version 0.1.13 (dan)
 	* Fix potential crasher when an empty string (instead of nil) was passed.
 	* Update graph x-axis time auto-magic.
