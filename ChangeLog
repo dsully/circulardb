@@ -1,3 +1,6 @@
+Version 0.1.15 (dan)
+	* Refactor graph module for displays.
+
 Version 0.1.14 (dan)
 	* Try and reorder Aggregate DBs if the driver is bunk.
 

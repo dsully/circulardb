@@ -34,7 +34,7 @@ module CircularDB
     # GNUPlot 4.2 adds: filledcurves & histograms. Common usage would be:
     # 'filledcurves above x1'
     attr_accessor :style, :title, :fix_logscale, :output_format, :show_data, :show_trend, :logscale, :debug
-    attr_accessor :start_time, :end_time, :size
+    attr_accessor :start_time, :end_time, :size, :aggregate
     attr_reader :output, :size, :cdbs
 
     def initialize(output = nil, start_time = nil, end_time = nil, cdbs = [])
@@ -185,12 +185,12 @@ module CircularDB
 
       x_start  = 0
       x_end    = 0
-      ylabel   = nil
-      y2label  = nil
       num_plots = 0
       for_graphing = 1
 
+      labels = Hash.new
       axes   = Hash.new
+      sums   = Hash.new
       styles = [3, 1, 2, 9, 10, 8, 7, 13]
 
       if (@start_time and @end_time and @start_time >= @end_time)
@@ -202,8 +202,6 @@ module CircularDB
  
       Gnuplot.open do |gp|
         Gnuplot::Plot.new(gp) do |plot|
-
-          total_sum = 0.0
 
           set_output(plot)
 
@@ -222,7 +220,6 @@ module CircularDB
 
           plots = @cdbs.size
 
-          debug = false
           @cdbs.keys.sort.each do |name|
 
             cdb     = @cdbs[name]
@@ -271,47 +268,18 @@ module CircularDB
               puts "Sum is NaN for: #{cdb.filename}"
               plots -= 1
               next
-            else
-              total_sum += sum
             end
 
             axis = axes[cdb.units]
 
             unless axis
-
-              if axes.length >= 1
-                axis = 'x1y2'
-              else
-                axis = 'x1y1'
-              end
-
+              axis = (axes.length >= 1) ? 'x1y2' : 'x1y1'
               axes[cdb.units] = axis 
             end
 
-            # Silence gnuplot warnings.
-            if name =~ /temperature/i
-              min = stats.min
-              max = stats.max
-
-              if min == max
-                range = "[-#{min-1.1}:#{max+1.1}]"
-
-                if axis == 'x1y1'
-                  plot.yrange range
-                else
-                  plot.y2range range
-                end
-              end
-
-            elsif sum < 1
-              range = '[0:1]'
-              
-              if axis == 'x1y1'
-                plot.yrange range
-              else
-                plot.y2range range
-              end
-            end
+            # Keep track of sum per axis for display purposes
+            sums[axis] ||= 0.0
+            sums[axis] += sum
 
             # Data can be processed on the fly by gnuplot. in the "using 1:2"
             # statement, "2" represents the y value to be read (2 means here
@@ -335,17 +303,17 @@ module CircularDB
               # the value provided by fixLogscale
               if @fix_logscale =~ /\d+\.?\d*/
 
-                ylabel  << ' [' << @fix_logscale.to_s << ' means zero] '
-                y2label << ' [' << @fix_logscale.to_s << ' means zero] '
+                labels["x1y1"]  << ' [' << @fix_logscale.to_s << ' means zero] '
+                labels["x1y2"]  << ' [' << @fix_logscale.to_s << ' means zero] '
               end
             end
 
             if @show_data or @show_trend
 
-              div = cdb.size
-
               # Divide by number of cdbs (aggregate) or 1.0 (single).
-              # This should be configurable.
+              # If the caller has asked for a sum (aggregate), rather than the average.
+              div = aggregate.eql?(:sum) ? 1.0 : cdb.size
+
               x = []
               y = []
 
@@ -388,82 +356,55 @@ module CircularDB
             return
           end
 
+          custom_format = false
+          ranges  = Hash.new
+          formats = Hash.new
+
           axes.each_pair do |units,axis|
+
+            if sums[axis] < 1
+              ranges[axis] = "[0:1]"
+            else
+              ranges[axis] = "[0:*]"
+            end
 
             # Default plot format - rounds to whole numbers and kilo/mega
             if units =~ /bytes per/
-              format = "\"%6.0s %cB\""
+              formats[axis] = "\"%6.0s %cB\""
             elsif units =~ /bits per/
-              format = "\"%6.0s %cb\""
+              formats[axis] = "\"%6.0s %cb\""
+            elsif units == "percent"
+              ranges[axis]  = "[0:100]"
+              formats[axis] = "\"%3.0s %%\""
+            elsif units == "milliseconds"
+              formats[axis] = "\"%6.0f ms\""
+            elsif units =~ /degrees/
+              formats[axis] = "\"%3.1s #{176.chr}\""
+            elsif units =~ /per sec/
             else
-              format = "\"%6.0s %c\""
+              formats[axis] = "\"%6.0s %c\""
             end
 
-            # Automatically scale to percentage based
-            if units == "percent"
-              plot.yrange "[0:100]"
-              format = "\"%3.0s %%\""
-            end
-
-            if units =~ /degrees/
-              format = "\"%3.1s #{176.chr}\""
+            if formats[axis].nil?
+              labels[axis] = "\"#{units}\""
             end
 
             if axis =~ /y1/
-              plot.format "y #{format}"
-              plot.ylabel "\"#{units}\""
-
-              if units =~ /percent/
-                plot.yrange "[0:100]"
-                plot.ylabel nil
-              elsif units =~ /bytes|bits/
-                plot.yrange "[0:*]" unless total_sum == 0.0
-              end
-
-              ylabel = units
+              plot.format "y #{formats[axis]}"
+              plot.yrange  ranges[axis]
+              plot.ylabel  labels[axis]
             else
-              plot.format "y2 #{format}"
-              plot.y2label "\"#{units}\""
-
-              if units =~ /percent/
-                plot.y2range "[0:100]"
-                plot.ylabel nil
-              elsif units =~ /bytes|bits/
-                plot.y2range "[0:*]" unless total_sum == 0.0
-              end
-
+              plot.format "y2 #{formats[axis]}"
+              plot.y2range ranges[axis]
+              plot.y2label  labels[axis]
+              #plot.y2label "\"#{units}\""
+              #plot.y2label y2label
               plot.y2tics
             end
           end
 
           plot.xrange "[\"#{x_start}\":\"#{x_end}\"]"
-
-          # for plots longer than a quarter, skip day and hour information
-          if (x_end - x_start <= 2 * ONE_HOUR)
-            plot.format "x \":%M\"" # hour
-
-          elsif (x_end - x_start <= 24 * ONE_HOUR)
-            plot.format "x \"%H\"" # day
-
-          elsif (x_end - x_start <= 30 * ONE_HOUR)
-            plot.format "x \"%H:%M\\n%m/%d\"" # day
-
-          elsif (x_end - x_start <= 9 * 24 * ONE_HOUR)
-
-            if (ylabel and ylabel == "per day")
-              plot.format "x \"%b %d\""
-            else
-              plot.format "x \"%H:%M\\n%b %d\"" # week
-            end
-
-          elsif (x_end - x_start <= 35 * 24 * ONE_HOUR)
-            plot.format "x \"%b %d\"" # month
-          elsif (x_end - x_start <= 4 * 31 * 24 * ONE_HOUR)
-            plot.format "x \"%b %d\"" # quarter
-          else
-            plot.format "x \"%m/%y\"" # > quarter
-          end
-
+          set_x_format(plot, x_start, x_end, labels["x1y1"])
         end
       end
 
@@ -481,6 +422,32 @@ module CircularDB
       @cdbs = nil
     end
 
+    def set_x_format(plot, x_start, x_end, ylabel)
+      format = nil
+
+      # for plots longer than a quarter, skip day and hour information
+      if (x_end - x_start <= 2 * ONE_HOUR)
+        format = ":%M"
+      elsif (x_end - x_start <= 24 * ONE_HOUR)
+        format = "%H"
+      elsif (x_end - x_start <= 30 * ONE_HOUR)
+        format  = "%H:%M\\n%m/%d"
+      elsif (x_end - x_start <= 9 * 24 * ONE_HOUR)
+        if ylabel =~ /per day/
+          format = "%b %d"
+        else
+          format = "%H\\n%d"
+        end
+      elsif (x_end - x_start <= 35 * 24 * ONE_HOUR)
+        format = "%b %d"
+      elsif (x_end - x_start <= 4 * 31 * 24 * ONE_HOUR)
+        format = "%b %d"
+      else
+        format = "%m/%y"
+      end
+
+      plot.format "x \"#{format}\""
+    end
   end
 end
 
