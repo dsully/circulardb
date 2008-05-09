@@ -41,7 +41,7 @@ typedef struct cdb_header_s {
     uint64_t max_records;
     uint64_t num_records;
     uint64_t start_record;
-    time_t last_updated;
+    time_t last_updated; // deprecated - not used internally.
 } cdb_header_t;
 
 typedef struct cdb_record_s {

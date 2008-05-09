@@ -254,6 +254,7 @@ int cdb_read_header(cdb_t *cdb) {
 
     /* if the header has already been read from backing store do not read again */
     if (cdb->synced == false) {
+        struct stat st;
 
         if (cdb_open(cdb) != 0) {
             return cdb_error();
@@ -264,14 +265,19 @@ int cdb_read_header(cdb_t *cdb) {
         }
 
         cdb->synced = true;
+
+        /* Calculate the number of records */
+        if (fstat(cdb->fd, &st) == 0) {
+            cdb->header->num_records = (st.st_size - HEADER_SIZE) / RECORD_SIZE;
+        } else {
+            cdb->header->num_records = 0;
+        }
     }
 
     return CDB_SUCCESS;
 }
 
 int cdb_write_header(cdb_t *cdb) {
-
-    time_t now;
 
     if (cdb->synced) {
         return CDB_SUCCESS;
@@ -281,9 +287,6 @@ int cdb_write_header(cdb_t *cdb) {
         return CDB_ERDONLY;
     }
 
-    time(&now);
-
-    cdb->header->last_updated = now;
     cdb->synced = false;
 
     if (cdb_open(cdb) > 0) {
@@ -378,10 +381,17 @@ int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t 
     if (j > 0) {
 
         offset = HEADER_SIZE + (cdb->header->start_record * RECORD_SIZE);
-        cdb->header->start_record += 1;
+        cdb->header->start_record += j;
         cdb->header->start_record %= cdb->header->max_records;
 
         if (pwrite(cdb->fd, &records[i], (RECORD_SIZE * j), offset) != (RECORD_SIZE * j)) {
+            return cdb_error();
+        }
+
+        cdb->synced = false;
+
+        /* start_record is no longer 0, so update the header */
+        if (cdb_write_header(cdb) != CDB_SUCCESS) {
             return cdb_error();
         }
     }
@@ -395,14 +405,6 @@ int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t 
     }
 
     *num_recs += len;
-
-    if (*num_recs > 0) {
-        cdb->synced = false;
-    }
-
-    if (cdb_write_header(cdb) != CDB_SUCCESS) {
-        return cdb_error();
-    }
 
 #ifdef DEBUG
     printf("write_records: wrote [%"PRIu64"] records\n", *num_recs);
@@ -1223,12 +1225,6 @@ int cdb_open(cdb_t *cdb) {
 int cdb_close(cdb_t *cdb) {
 
     if (cdb != NULL) {
-
-        if (_cdb_is_writable(cdb)) {
-            if (cdb_write_header(cdb) != CDB_SUCCESS) {
-                return cdb_error();
-            }
-        }
 
         if (cdb->fd > 0) {
             if (close(cdb->fd) != 0) {
