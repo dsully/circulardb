@@ -21,7 +21,6 @@ static const char svnid[] __attribute__ ((unused)) = "$Id$";
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -295,12 +294,16 @@ int cdb_write_header(cdb_t *cdb) {
         return cdb_error();
     }
 
+    /* This really slows down moneypenny - we're ok with trusting the VFS
+     * right now. */
     /* OS X doesn't have fdatasync() */
+#if 0
 #ifdef HAVE_FDATASYNC
     if (fdatasync(cdb->fd) != 0) return cdb_error();
 #else
 #ifdef HAVE_FSYNC
     if (fsync(cdb->fd) != 0) return cdb_error();
+#endif
 #endif
 #endif
 
@@ -329,8 +332,10 @@ int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t 
     /* read old header if it exists.
        write a header out, since the db may not have existed.
     */
-    uint64_t i = 0;
-    *num_recs  = 0;
+    uint64_t i   = 0;
+    uint64_t j   = 0;
+    *num_recs    = 0;
+    off_t offset = 0;
 
     if (cdb_read_header(cdb) != CDB_SUCCESS) {
         return cdb_error();
@@ -344,45 +349,52 @@ int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t 
         return CDB_EINVMAX;
     }
 
-    for (i = 0; i < len; i++) {
+    /* Logic for writes:
+    cdb is 5 records.
+        try to write 7 records
+        len = 7
+        len + 0 > 5
+        j = (7 + 0) - 5
+        j = 2
+        i = 7 - 2
+        i = 5
 
-#ifdef DEBUG
-        printf("writing record: [%d] [%f]\n", (int)records[i].time, records[i].value);
-#endif
+        need to write j records at offset: HEADER_SIZE + (cdb->header->start_record * RECORD_SIZE)
+        index into records is i
 
-        off_t offset = 0;
+        need to write i records at offset: HEADER_SIZE + (cdb->header->num_records * RECORD_SIZE)
+        index into records is 0;
+    */
 
-        /* XXX - error here, or just ignore? */
-        if (records[i].time == 0) {
-#ifdef DEBUG
-            printf("write_records: time == 0; skipping!\n");
-#endif
-            continue;
-        }
+    /* Calculate our indicies into the records array. */
+    if (len + cdb->header->num_records >= cdb->header->max_records) {
+        j = (len + cdb->header->num_records) - cdb->header->max_records;
+        i = (len - j);
+    } else {
+        i = len;
+    }
 
-        /* Do the circular wrap-around. start_record needs to start
-         * incrementing with num_records */
-        if (cdb->header->num_records >= cdb->header->max_records) {
+    /* If we need to wrap around */
+    if (j > 0) {
 
-            offset = HEADER_SIZE + (cdb->header->start_record * RECORD_SIZE);
-            cdb->header->start_record += 1;
-            cdb->header->start_record %= cdb->header->max_records;
+        offset = HEADER_SIZE + (cdb->header->start_record * RECORD_SIZE);
+        cdb->header->start_record += 1;
+        cdb->header->start_record %= cdb->header->max_records;
 
-        } else {
-
-            offset = HEADER_SIZE + (cdb->header->num_records * RECORD_SIZE);
-            cdb->header->num_records += 1;
-        }
-
-        if (pwrite(cdb->fd, &records[i], RECORD_SIZE, offset) != RECORD_SIZE) {
-            /* If a write fails, do we even try to write_header() ? */
-            // fprintf(stderr, "Couldn't write record [%d] [%s] for: [%s]\n", errno, strerror(errno), cdb->filename);
+        if (pwrite(cdb->fd, &records[i], (RECORD_SIZE * j), offset) != (RECORD_SIZE * j)) {
             return cdb_error();
         }
-
-        *num_recs += 1;
-        /* DRK might want to consider periodic syncs? */
     }
+
+    /* Normal case */
+    offset = HEADER_SIZE + (cdb->header->num_records * RECORD_SIZE);
+    cdb->header->num_records += i;
+
+    if (pwrite(cdb->fd, &records[0], (RECORD_SIZE * i), offset) != (RECORD_SIZE * i)) {
+        return cdb_error();
+    }
+
+    *num_recs += len;
 
     if (*num_recs > 0) {
         cdb->synced = false;
