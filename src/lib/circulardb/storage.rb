@@ -4,7 +4,7 @@ module CircularDB
 
     require 'circulardb_ext'
 
-    [:name, :filename, :description, :units, :type, :num_records, :last_updated].each do |meth|
+    [:name, :filename, :description, :units, :type, :num_records].each do |meth|
       class_eval <<-METH
         def #{meth}; @header[:#{meth}]; end
       METH
@@ -14,6 +14,10 @@ module CircularDB
       class_eval <<-METH
         def #{meth}=(value); _set_header("#{meth}", value); end
       METH
+    end
+
+    def last_updated
+      File.stat(self.filename).mtime.to_i
     end
 
     # The number of cdbs in a cdb. Aggregate provides a real size.

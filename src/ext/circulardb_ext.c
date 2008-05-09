@@ -8,6 +8,7 @@
 #include <rubyio.h>
 
 #include <circulardb.h>
+#include <fcntl.h>
 
 /* TODO handle clone/dup */
 
@@ -103,7 +104,7 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
 
     cdb_t *cdb;
     VALUE header = rb_hash_new();
-    VALUE filename, flags, mode, name, max_records, num_records, type, units, desc, last_updated;
+    VALUE filename, flags, mode, name, max_records, num_records, type, units, desc;
 
     char *regex = ALLOCA_N(char, 4);
 
@@ -135,7 +136,6 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
         desc         = rb_str_new2(cdb->header->description);
         max_records  = ULL2NUM(cdb->header->max_records);
         num_records  = ULL2NUM(cdb->header->num_records);
-        last_updated = INT2FIX(cdb->header->last_updated);
 
     } else {
 
@@ -171,10 +171,6 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
     rb_hash_aset(header, ID2SYM(rb_intern("num_records")), num_records);
     rb_hash_aset(header, ID2SYM(rb_intern("max_records")), max_records);
     rb_hash_aset(header, ID2SYM(rb_intern("description")), desc);
-
-    if (!NIL_P(last_updated)) {
-        rb_hash_aset(header, ID2SYM(rb_intern("last_updated")), last_updated);
-    }
 
     rb_iv_set(self, "@header", header);
     rb_iv_set(self, "@statistics", Qnil);
@@ -480,6 +476,76 @@ static VALUE cdb_rb_statistics(int argc, VALUE *argv, VALUE self) {
     return statistics;
 }
 
+/* Implement a a zip map write to stay out of Ruby thread context switching. */
+static int _process_each_record(VALUE uuid, VALUE values, VALUE args) {
+
+    if (uuid == Qnil) {
+        rb_raise(rb_eRuntimeError, "Empty or null UUID.");
+    }
+
+    VALUE basepath = rb_ary_entry(args, 0);
+    VALUE array    = rb_funcall(rb_ary_entry(args, 1), rb_intern("zip"), 1, values);
+
+    uint64_t len = RARRAY(array)->len;
+    uint64_t i   = 0;
+    uint64_t cnt = 0;
+    bool     ret = false;
+    int  pathlen = RSTRING(basepath)->len + RSTRING(uuid)->len + 2;
+    uint64_t *t  = (uint64_t*)rb_ary_entry(args, 2);
+
+    cdb_t *cdb = cdb_new();
+    cdb->flags = O_RDWR|O_CREAT;
+    cdb->mode  = -1;
+
+    cdb_record_t *records = ALLOCA_N(cdb_record_t, len);
+    cdb->filename         = ALLOCA_N(char, pathlen);
+
+    snprintf(cdb->filename, pathlen, "%s/%s", StringValuePtr(basepath), StringValuePtr(uuid));
+
+    /* Try the open */
+    if (cdb_open(cdb) != CDB_SUCCESS) {
+        cdb_free(cdb);
+        rb_sys_fail(0);
+    }
+
+    /* Turn any nil's into NaN */
+    for (i = 0; i < len; i++) {
+        VALUE record = rb_ary_entry(array, i);
+        VALUE value  = rb_ary_entry(record, 1);
+
+        records[i].time  = NUM2ULONG(rb_ary_entry(record, 0));
+        records[i].value = value == Qnil ? CDB_NAN : NUM2DBL(value);
+    }
+
+    ret = cdb_write_records(cdb, records, len, &cnt);
+
+    if (ret != CDB_SUCCESS || cdb_close(cdb) != CDB_SUCCESS) {
+        cdb_free(cdb);
+        rb_sys_fail(0);
+    }
+
+    cdb_free(cdb);
+
+    *t += cnt;
+
+    return Qtrue;
+}
+
+static VALUE cdb_rb_write_zip_map(VALUE self, VALUE basepath, VALUE timestamps, VALUE records_map) {
+
+    uint64_t written = 0;
+
+    VALUE args = rb_ary_new2(3);
+
+    rb_ary_store(args, 0, basepath);
+    rb_ary_store(args, 1, timestamps);
+    rb_ary_store(args, 2, (VALUE)&written);
+
+    rb_hash_foreach(records_map, _process_each_record, args);
+
+    return INT2FIX(written);
+}
+
 /****************************************************************************************
  * Aggregate functions
  ****************************************************************************************/
@@ -709,6 +775,9 @@ void Init_circulardb_ext() {
     rb_define_method(cStorage, "print_records", cdb_rb_print_records, -1); 
     rb_define_method(cStorage, "_set_header", _set_header, 2); 
     rb_define_method(cStorage, "statistics", cdb_rb_statistics, -1); 
+
+    /* Class method for fast writing */
+    rb_define_module_function(cStorage, "write_zip_map", cdb_rb_write_zip_map, 3);
 
     /* CircularDB::Aggregate class */
     rb_define_method(cAggregate, "initialize", cdb_agg_rb_initialize, 1); 

@@ -1,3 +1,7 @@
+Version 0.1.16 (dan)
+	* Sync to circulardb 0.1.12 API
+	* Add experimental write_zip_map() method.
+
 Version 0.1.15 (dan)
 	* Refactor graph module for displays.
 
