@@ -575,7 +575,7 @@ int cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end, uint
 
 static int _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_records, long *factor) {
 
-    if ((strcmp(cdb->header->type, "counter") == 0) && *num_records != 0) {
+    if (*num_records != 0) {
 
         if (*num_records > 0) {
             *num_records += 1;
@@ -845,7 +845,7 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
     /* Deal with cooking the output */
     if (cooked) {
 
-        int is_counter = 0;
+        bool is_counter = false;
         //int check_min_max = 0;
         long factor = 0;
         uint64_t i = 0;
@@ -860,14 +860,14 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
             return CDB_ENOMEM;
         }
 
-        if (_compute_scale_factor_and_num_records(cdb, &num_requested, &factor)) {
-            free(crecords);
-            free(buffer);
-            return cdb_error();
-        }
-
         if (strcmp(cdb->header->type, "counter") == 0) {
-            is_counter = 1;
+            is_counter = true;
+
+            if (_compute_scale_factor_and_num_records(cdb, &num_requested, &factor)) {
+                free(crecords);
+                free(buffer);
+                return cdb_error();
+            }
         }
 
         for (i = 0; i < *num_recs; i++) {
