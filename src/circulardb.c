@@ -1088,6 +1088,12 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
         }
 
         for (j = 0; j < *driver_num_recs; j++) {
+
+            /* Check for out of bounds */
+            if (j > follower_num_recs) {
+                break;
+            }
+
             follower_x_values[j] = follower_records[j].time;
             follower_y_values[j] = follower_records[j].value;
         }
