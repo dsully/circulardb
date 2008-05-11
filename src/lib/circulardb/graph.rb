@@ -245,14 +245,14 @@ module CircularDB
             end
 
             if records.empty? or records.first.nil?
-              puts "Busted read_records for: #{cdb.filename}"
+              puts "Busted read_records for: #{cdb.filename}" if @debug
               plots -= 1
               next
             end
 
             # 5 is arbitrary
             if records.length < 5
-              puts "No records to plot for: #{cdb.filename}"
+              puts "No records to plot for: #{cdb.filename}" if @debug
               plots -= 1
               next
             end
@@ -317,10 +317,16 @@ module CircularDB
               x = []
               y = []
 
-              records.each do |r|
-                x << r[0]
-                y << r[1] / div
-              end
+              #if @show_trend
+              #  left  = records.size-1
+              #  average(records, x, y, 160, left)
+
+              #else
+                records.each do |r|
+                  x << r[0]
+                  y << r[1] / div
+                end
+              #end
 
               plot.data << Gnuplot::DataSet.new([x, y]) do |ds|
 
@@ -331,11 +337,13 @@ module CircularDB
                   ds.using = "1:#{yaxis} axes #{axis}"
                 elsif @show_trend
                   ds.using = "1:#{yaxis} smooth bezier axes #{axis}"
+                  #ds.using = "1:#{yaxis} axes #{axis}"
                 end
               end
 
               num_plots += 1
               num_plots %= styles.length
+
             end
 
             if x_start == 0
@@ -352,7 +360,7 @@ module CircularDB
           end
 
           if plots == 0
-            puts "Nothing to plot!"
+            puts "Nothing to plot!" if @debug
             return
           end
 
@@ -370,19 +378,21 @@ module CircularDB
 
             # Default plot format - rounds to whole numbers and kilo/mega
             if units =~ /bytes per/
-              formats[axis] = "\"%6.0s %cB\""
+              formats[axis] = "\"%5.0s %cB\""
             elsif units =~ /bits per/
-              formats[axis] = "\"%6.0s %cb\""
+              formats[axis] = "\"%5.0s %cb\""
             elsif units == "percent"
               ranges[axis]  = "[0:100]"
               formats[axis] = "\"%3.0s %%\""
             elsif units == "milliseconds"
-              formats[axis] = "\"%6.0f ms\""
+              formats[axis] = "\"%5.0f ms\""
+            elsif units == "seconds"
+              formats[axis] = "\"%3.2f s\""
             elsif units =~ /degrees/
               formats[axis] = "\"%3.1s #{176.chr}\""
-            elsif units =~ /per sec/
+            elsif units =~ /per sec/ or units == "qps"
             else
-              formats[axis] = "\"%6.0s %c\""
+              formats[axis] = "\"%5.0s %c\""
             end
 
             if formats[axis].nil?
@@ -415,6 +425,25 @@ module CircularDB
         return graph
       end
 
+    end
+
+    # Quick hack (till it can make it in C) to generate 
+    def average(records, x, y, step, left)
+
+      (0..left).step(step) do |i|
+
+        xi = []
+        yi = []
+
+        records[i,step].each do |r|
+          xi << r[0]
+          yi << r[1]
+        end
+
+        x << xi.mean
+        y << yi.mean
+        left -= step
+      end
     end
 
     def close
@@ -452,6 +481,18 @@ module CircularDB
 end
 
 class Array
+
+  def sum
+    inject(0) { |sum, x| sum ? sum + x : x }
+  end
+
+  def mean
+    return 0 if self.size == 0
+    sum = 0
+    self.each { |v| sum += v }
+    sum / self.size.to_f
+  end
+
   def to_gplot_fast
     self.collect { |a| a.join(" ") }.join("\n") + "\ne"
   end
