@@ -522,7 +522,7 @@ bool cdb_update_record(cdb_t *cdb, time_t time, double value) {
     return true;
 }
 
-int cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end, uint64_t *num_recs) {
+int cdb_discard_records_in_time_range(cdb_t *cdb, cdb_request_t *request, uint64_t *num_recs) {
 
     uint64_t i = 0;
     int64_t lrec;
@@ -537,7 +537,7 @@ int cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end, uint
         return CDB_ERDONLY;
     }
 
-    lrec = _logical_record_for_time(cdb, start, 0, 0);
+    lrec = _logical_record_for_time(cdb, request->start, 0, 0);
 
     if (lrec >= 1) {
         lrec -= 1;
@@ -547,7 +547,7 @@ int cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end, uint
 
         time_t rtime = _time_for_logical_record(cdb, i);
 
-        if (rtime >= start && rtime <= end) {
+        if (rtime >= request->start && rtime <= request->end) {
 
             cdb_record_t record[RECORD_SIZE];
 
@@ -723,8 +723,7 @@ double cdb_get_statistic(cdb_range_t *range, cdb_statistics_enum_t type) {
     }
 }
 
-static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, 
-    int cooked, long step, uint64_t *num_recs, cdb_record_t **records) {
+static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_recs, cdb_record_t **records) {
 
     int64_t first_requested_logical_record;
     int64_t last_requested_logical_record;
@@ -738,7 +737,7 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
         return cdb_error();
     }
 
-    if (start != 0 && end != 0 && end < start) {
+    if (request->start != 0 && request->end != 0 && request->end < request->start) {
         return CDB_ETMRANGE;
     }
 
@@ -760,43 +759,43 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
      
       switch the meaning of -ve/+ve to be more array like
     */
-    if (num_requested != 0) {
-        num_requested = -num_requested;
+    if (request->count != 0) {
+        request->count = -request->count;
     }
 
 #ifdef DEBUG
-    printf("read_records start: [%ld]\n", start);
-    printf("read_records end: [%ld]\n", end);
-    printf("read_records num_requested: [%"PRIu64"]\n", num_requested);
+    printf("read_records start: [%ld]\n", request->start);
+    printf("read_records end: [%ld]\n", request->end);
+    printf("read_records num_requested: [%"PRIu64"]\n", request->count);
 #endif
 
-    if (num_requested != 0 && num_requested < 0 && start == 0) {
+    if (request->count != 0 && request->count < 0 && request->start == 0) {
         /* if reading only few records from the end, just set -ve offset to seek to */
-        first_requested_logical_record = num_requested;
+        first_requested_logical_record = request->count;
 
     } else {
         /* compute which record to start reading from the beginning, based on start time specified. */
-        first_requested_logical_record = _logical_record_for_time(cdb, start, 0, 0);
+        first_requested_logical_record = _logical_record_for_time(cdb, request->start, 0, 0);
     }
 
     /* if end is not defined, read all the records or only read uptill the specified record. */
-    if (end == 0) {
+    if (request->end == 0) {
 
         last_requested_logical_record = cdb->header->num_records - 1;
 
     } else {
 
-        last_requested_logical_record = _logical_record_for_time(cdb, end, 0, 0);
+        last_requested_logical_record = _logical_record_for_time(cdb, request->end, 0, 0);
 
         /* this can return something > end, check for that */
-        if (_time_for_logical_record(cdb, last_requested_logical_record) > end) {
+        if (_time_for_logical_record(cdb, last_requested_logical_record) > request->end) {
             last_requested_logical_record -= 1;
         }
     }
 
     last_requested_physical_record = (last_requested_logical_record + cdb->header->start_record) % cdb->header->num_records;
 
-    seek_logical_record = first_requested_logical_record;
+    seek_logical_record  = first_requested_logical_record;
     seek_physical_record = _seek_to_logical_record(cdb, seek_logical_record);
 
     if (last_requested_physical_record >= seek_physical_record) {
@@ -845,7 +844,7 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
     }
 
     /* Deal with cooking the output */
-    if (cooked) {
+    if (request->cooked) {
 
         bool is_counter = false;
         //int check_min_max = 0;
@@ -866,7 +865,7 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
             is_counter = true;
         }
 
-        if (_compute_scale_factor_and_num_records(cdb, is_counter, &num_requested, &factor)) {
+        if (_compute_scale_factor_and_num_records(cdb, is_counter, &request->count, &factor)) {
             free(crecords);
             free(buffer);
             return cdb_error();
@@ -932,11 +931,12 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
     }
 
     /* If we've been requested to average the records & timestamps */
-    if (step > 1) {
+    if (request->step > 1) {
 
         cdb_record_t *arecords;
+        long     step      = request->step;
         uint64_t step_recs = 0;
-        uint64_t leftover  = (*num_recs % step);
+        uint64_t leftover  = (*num_recs % request->step);
         uint64_t i = 0;
 
         if ((arecords = calloc((int)((*num_recs / step) + leftover), RECORD_SIZE)) == NULL) {
@@ -983,16 +983,16 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
     }
 
     /* now pull out the number of requested records if asked */
-    if (num_requested != 0 && *num_recs >= abs(num_requested)) {
+    if (request->count != 0 && *num_recs >= abs(request->count)) {
 
         uint64_t start_index = 0;
 
-        if (num_requested <= 0) {
+        if (request->count <= 0) {
 
-            start_index = *num_recs - abs(num_requested);
+            start_index = *num_recs - abs(request->count);
         }
 
-        *num_recs = abs(num_requested);
+        *num_recs = abs(request->count);
 
         if ((*records  = calloc(*num_recs, RECORD_SIZE)) == NULL) {
             free(buffer);
@@ -1011,18 +1011,18 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
     return CDB_SUCCESS;
 }
 
-int cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, 
-    int cooked, long step, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range) {
+int cdb_read_records(cdb_t *cdb, cdb_request_t *request,
+    uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range) {
 
     int ret   = CDB_SUCCESS;
 
-    ret = _cdb_read_records(cdb, start, end, num_requested, cooked, step, num_recs, records);
+    ret = _cdb_read_records(cdb, request, num_recs, records);
 
     if (ret == CDB_SUCCESS) {
 
         if (*num_recs > 0) {
-            range->start_time = start;
-            range->end_time = end;
+            range->start_time = request->start;
+            range->end_time   = request->end;
 
             _compute_statistics(range, num_recs, *records);
         }
@@ -1031,15 +1031,14 @@ int cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested
     return ret;
 }
 
-void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, FILE *fh, 
-    const char *date_format, int cooked, long step) {
+void cdb_print_records(cdb_t *cdb, cdb_request_t *request, FILE *fh, const char *date_format) {
 
     uint64_t i = 0;
     uint64_t num_recs = 0;
     
     cdb_record_t *records = NULL;
 
-    if (_cdb_read_records(cdb, start, end, num_requested, cooked, step, &num_recs, &records) == CDB_SUCCESS) {
+    if (_cdb_read_records(cdb, request, &num_recs, &records) == CDB_SUCCESS) {
 
         for (i = 0; i < num_recs; i++) {
 
@@ -1053,6 +1052,13 @@ void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_request
 void cdb_print(cdb_t *cdb) {
 
     const char *date_format = "%Y-%m-%d %H:%M:%S";
+    cdb_request_t request;
+
+    request.start  = 0;
+    request.end    = 0;
+    request.count  = 0;
+    request.step   = 0;
+    request.cooked = false;
 
     printf("============== Header ================\n");
 
@@ -1063,7 +1069,7 @@ void cdb_print(cdb_t *cdb) {
     if (strcmp(cdb->header->type, "counter") == 0) {
 
         printf("============= Raw Counter Records =============\n");
-        cdb_print_records(cdb, 0, 0, 0, stdout, date_format, 0, 0);
+        cdb_print_records(cdb, &request, stdout, date_format);
         printf("============== End Raw Counter Records ==============\n");
 
         printf("============== Cooked Records ================\n");
@@ -1072,13 +1078,15 @@ void cdb_print(cdb_t *cdb) {
         printf("============== Records ================\n");
     }
 
-    cdb_print_records(cdb, 0, 0, 0, stdout, date_format, 1, 0);
+    request.cooked = true;
+    cdb_print_records(cdb, &request, stdout, date_format);
+
     printf("============== End ================\n");
 }
 
 /* Take in an array of cdbs */
-int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
-    int cooked, long step, uint64_t *driver_num_recs, cdb_record_t **records, cdb_range_t *range) {
+int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *request,
+    uint64_t *driver_num_recs, cdb_record_t **records, cdb_range_t *range) {
 
     uint64_t i = 0;
     int ret    = CDB_SUCCESS;
@@ -1090,7 +1098,7 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
     }
 
     /* The first cdb is the driver */
-    ret = _cdb_read_records(cdbs[0], start, end, num_requested, cooked, step, driver_num_recs, &driver_records);
+    ret = _cdb_read_records(cdbs[0], request, driver_num_recs, &driver_records);
 
     if (ret != CDB_SUCCESS) {
         free(driver_records);
@@ -1127,8 +1135,8 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
     gsl_interp_init(interp, driver_x_values, driver_y_values, *driver_num_recs);
 
     /* restrict to the driver's time range */
-    if (start == 0) start = driver_records[0].time;
-    if (end   == 0) end   = driver_records[*driver_num_recs-1].time;
+    if (request->start == 0) request->start = driver_records[0].time;
+    if (request->end   == 0) request->end   = driver_records[*driver_num_recs-1].time;
 
     for (i = 1; i < num_cdbs; i++) {
 
@@ -1137,7 +1145,7 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
 
         cdb_record_t *follower_records = NULL;
 
-        ret = _cdb_read_records(cdbs[i], start, end, num_requested, cooked, step, &follower_num_recs, &follower_records);
+        ret = _cdb_read_records(cdbs[i], request, &follower_num_recs, &follower_records);
 
         /* Just bail, free all allocations below and let the error bubble up */
         if (ret != 0) break;
@@ -1172,8 +1180,8 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
 
     if (ret == CDB_SUCCESS && *driver_num_recs > 0) {
         /* Compute all the statistics for this range */
-        range->start_time = start;
-        range->end_time = end;
+        range->start_time = request->start;
+        range->end_time   = request->end;
 
         _compute_statistics(range, driver_num_recs, *records);
     }
@@ -1190,8 +1198,7 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
     return ret;
 }
 
-void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
-    FILE *fh, const char *date_format, int cooked, long step) {
+void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *request, FILE *fh, const char *date_format) {
 
     uint64_t i = 0;
     uint64_t num_recs = 0;
@@ -1199,7 +1206,7 @@ void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_
     cdb_record_t *records = NULL;
     cdb_range_t *range = calloc(1, sizeof(cdb_range_t));
 
-    cdb_read_aggregate_records(cdbs, num_cdbs, start, end, num_requested, cooked, step, &num_recs, &records, range);
+    cdb_read_aggregate_records(cdbs, num_cdbs, request, &num_recs, &records, range);
 
     for (i = 0; i < num_recs; i++) {
 
@@ -1259,6 +1266,16 @@ cdb_t* cdb_new(void) {
     cdb->mode = -1;
 
     return cdb;
+}
+
+cdb_request_t cdb_new_request(void) {
+    cdb_request_t request;
+    request.start  = 0;
+    request.end    = 0;
+    request.count  = 0;
+    request.cooked = true;
+    request.step   = 0;
+    return request;
 }
 
 int cdb_open(cdb_t *cdb) {

@@ -58,6 +58,15 @@ typedef struct cdb_s {
     cdb_header_t *header;
 } cdb_t;
 
+/* roll up all the previous positional arguments */
+typedef struct cdb_request_s {
+    time_t start;
+    time_t end;
+    int64_t count; /* number of records requested */
+    bool cooked;   /* For counter types, do the math */
+    long step;     /* Request averaged data */
+} cdb_request_t;
+
 /* Hold all the stats for a particular time range, so this computation can be
  * done only once. */
 typedef struct cdb_range_s {
@@ -109,6 +118,7 @@ enum {
 
 /* Basic CDB handling functions */
 cdb_t* cdb_new(void);
+cdb_request_t cdb_new_request(void);
 
 /* Return CDB_SUCCESS or errno */
 int cdb_free(cdb_t *cdb);
@@ -131,28 +141,26 @@ int cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t
 bool cdb_update_record(cdb_t *cdb, time_t time, double value);
 
 /* Return CDB_SUCCESS, CDB_ERDONLY or errno */
-int cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end, uint64_t *num_recs);
+int cdb_discard_records_in_time_range(cdb_t *cdb, cdb_request_t *request, uint64_t *num_recs);
 
 double cdb_get_statistic(cdb_range_t *range, cdb_statistics_enum_t type);
 
 /* Return CDB_SUCCESS, CDB_ENOMEM, CDB_ETMRANGE, CDB_ENORECS or errno */
-int cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested,
-    int cooked, long step, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range);
+int cdb_read_records(cdb_t *cdb, cdb_request_t *request,
+    uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range);
 
 void cdb_print_header(cdb_t * cdb);
 
-void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, FILE *fh, 
-    const char *date_format, int cooked, long step);
+void cdb_print_records(cdb_t *cdb, cdb_request_t *request, FILE *fh, const char *date_format);
 
 void cdb_print(cdb_t *cdb);
 
 /* Aggregation interface */
 /* Return CDB_SUCCESS, CDB_ENOMEM, CDB_ETMRANGE, CDB_ENORECS, CDB_EINTERPD, CDB_EINTERPF or errno */
-int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
-    int cooked, long step, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range);
+int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *request,
+    uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range);
 
-void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
-    FILE *fh, const char *date_format, int cooked, long step);
+void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *request, FILE *fh, const char *date_format);
 
 #endif
 
