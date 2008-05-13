@@ -79,7 +79,7 @@ START_TEST (test_cdb_basic_rw)
     fail_unless(num_recs == 10, "Couldn't write 10 records");
 
     num_recs = 0;
-    cdb_read_records(cdb, 0, 0, 0, 1, &num_recs, &r_records, range);
+    cdb_read_records(cdb, 0, 0, 0, 1, 0, &num_recs, &r_records, range);
 
     fail_unless(num_recs == 10, "Couldn't read 10 records");
     fail_unless(cdb->header->num_records == 10, "header count doesn't match");
@@ -102,7 +102,7 @@ START_TEST (test_cdb_basic_rw)
         memset(range, 0, sizeof(cdb_range_t));
         memset(r_records, 0, sizeof(r_records));
         num_recs = 0;
-        cdb_read_records(cdb, 0, 0, 0, 1, &num_recs, &r_records, range);
+        cdb_read_records(cdb, 0, 0, 0, 1, 0, &num_recs, &r_records, range);
 
         fail_unless(r_records[5].value == 999.0005, "Float check");
     }
@@ -111,7 +111,7 @@ START_TEST (test_cdb_basic_rw)
         memset(range, 0, sizeof(cdb_range_t));
         memset(r_records, 0, sizeof(r_records));
         num_recs = 0;
-        cdb_read_records(cdb, 0, 0, 4, 1, &num_recs, &r_records, range);
+        cdb_read_records(cdb, 0, 0, 4, 1, 0, &num_recs, &r_records, range);
 
         fail_unless(num_recs == 4, "Requested numreqs");
         fail_unless(r_records[0].value == 7, NULL);
@@ -124,7 +124,7 @@ START_TEST (test_cdb_basic_rw)
         memset(range, 0, sizeof(cdb_range_t));
         memset(r_records, 0, sizeof(r_records));
         num_recs = 0;
-        cdb_read_records(cdb, 0, 0, -4, 1, &num_recs, &r_records, range);
+        cdb_read_records(cdb, 0, 0, -4, 1, 0, &num_recs, &r_records, range);
 
         fail_unless(num_recs == 4, "Requested numreqs");
         fail_unless(r_records[0].value == 1, NULL);
@@ -137,7 +137,7 @@ START_TEST (test_cdb_basic_rw)
         memset(range, 0, sizeof(cdb_range_t));
         memset(r_records, 0, sizeof(r_records));
         num_recs = 0;
-        cdb_read_records(cdb, 1190860355, 0, 0, 1, &num_recs, &r_records, range);
+        cdb_read_records(cdb, 1190860355, 0, 0, 1, 0, &num_recs, &r_records, range);
 
         fail_unless(num_recs == 8, "Requested numreqs");
         fail_unless(r_records[0].time == 1190860355, NULL);
@@ -148,7 +148,7 @@ START_TEST (test_cdb_basic_rw)
         memset(range, 0, sizeof(cdb_range_t));
         memset(r_records, 0, sizeof(r_records));
         num_recs = 0;
-        cdb_read_records(cdb, 0, 1190860355, 0, 1, &num_recs, &r_records, range);
+        cdb_read_records(cdb, 0, 1190860355, 0, 1, 0, &num_recs, &r_records, range);
 
         fail_unless(num_recs == 3, "Requested numreqs");
         fail_unless(r_records[0].time == 1190860353, NULL);
@@ -160,7 +160,7 @@ START_TEST (test_cdb_basic_rw)
         memset(range, 0, sizeof(cdb_range_t));
         memset(r_records, 0, sizeof(r_records));
         num_recs = 0;
-        cdb_read_records(cdb, 1190860353, 1190860355, 0, 1, &num_recs, &r_records, range);
+        cdb_read_records(cdb, 1190860353, 1190860355, 0, 1, 0, &num_recs, &r_records, range);
 
         fail_unless(num_recs == 2, "Requested numreqs");
         fail_unless(r_records[0].time == 1190860354, NULL);
@@ -171,7 +171,7 @@ START_TEST (test_cdb_basic_rw)
         memset(range, 0, sizeof(cdb_range_t));
         memset(r_records, 0, sizeof(r_records));
         num_recs = 0;
-        cdb_read_records(cdb, 1190860353, 1190860360, -1, 1, &num_recs, &r_records, range);
+        cdb_read_records(cdb, 1190860353, 1190860360, -1, 1, 0, &num_recs, &r_records, range);
 
         fail_unless(num_recs == 1, "Requested numreqs");
         fail_unless(r_records[0].time == 1190860354, NULL);
@@ -205,7 +205,7 @@ START_TEST (test_cdb_aggregate_basic)
     fail_unless(cdb_write_records(cdb, w_records, 10) == 10, "Couldn't write 10 records");
 
     fail_unless(
-        cdb_read_records(cdb, 0, 0, 0, 1, &num_recs, &r_records, range) == 10,
+        cdb_read_records(cdb, 0, 0, 0, 1, 0, &num_recs, &r_records, range) == 10,
         "Couldn't read 10 records"
     );
 
@@ -265,7 +265,7 @@ START_TEST (test_cdb_overflow)
     cdb_write_record(cdb, 1190860364, 10);
     cdb_write_record(cdb, 1190860365, 12);
 
-    cdb_read_records(cdb, 0, 0, 0, 1, &num_recs, &r_records, range);
+    cdb_read_records(cdb, 0, 0, 0, 1, 0, &num_recs, &r_records, range);
 
     fail_unless(num_recs == 2, "Couldn't read 2 records");
 
@@ -298,10 +298,50 @@ START_TEST (test_cdb_wrap)
     cdb_write_record(cdb, 1190860367, 18);
     cdb_write_record(cdb, 1190860368, 20);
 
-    cdb_read_records(cdb, 0, 0, 0, 1, &num_recs, &r_records, range);
+    cdb_read_records(cdb, 0, 0, 0, 1, 0, &num_recs, &r_records, range);
 
     fail_unless(num_recs == 5, "Couldn't read 5 records");
     fail_unless(r_records[0].value == 12);
+
+    free(range);
+    free(r_records);
+    cdb_close(cdb);
+    cdb_free(cdb);
+}
+END_TEST
+
+START_TEST (test_cdb_average)
+{
+    cdb_record_t *r_records = NULL;
+    cdb_range_t *range      = calloc(1, sizeof(cdb_range_t));
+    uint64_t num_recs = 0;
+    int i = 0;
+    int step = 5;
+
+    cdb_t *cdb = create_cdb("gauge", "percent", 20);
+
+    if (!cdb) fail("cdb is null");
+
+    for (i = 0; i < 20; i++) {
+        cdb_write_record(cdb, 1190860358+i, i);
+    }
+
+    cdb_read_records(cdb, 0, 0, 0, 1, step, &num_recs, &r_records, range);
+
+    // for first 5, should have time of 1190860360 and value of 2
+    // for next  5, should have time of 1190860365 and value of 7
+    fail_unless(num_recs == 4, "Couldn't read 4 records");
+    fail_unless(r_records[0].time  == 1190860360);
+    fail_unless(r_records[0].value == 2);
+
+    fail_unless(r_records[1].time  == 1190860365);
+    fail_unless(r_records[1].value == 7);
+
+    fail_unless(r_records[2].time  == 1190860370);
+    fail_unless(r_records[2].value == 12);
+
+    fail_unless(r_records[3].time  == 1190860375);
+    fail_unless(r_records[3].value == 17);
 
     free(range);
     free(r_records);
@@ -319,6 +359,7 @@ Suite* cdb_suite (void) {
     tcase_add_test(tc_core1, test_cdb_basic_rw);
     tcase_add_test(tc_core1, test_cdb_overflow);
     tcase_add_test(tc_core1, test_cdb_wrap);
+    tcase_add_test(tc_core1, test_cdb_average);
     suite_add_tcase(s, tc_core1);
 
     TCase *tc_core2 = tcase_create("Aggregate");

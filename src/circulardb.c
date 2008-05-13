@@ -573,14 +573,16 @@ int cdb_discard_records_in_time_range(cdb_t *cdb, time_t start, time_t end, uint
     return CDB_SUCCESS;
 }
 
-static int _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_records, long *factor) {
+static int _compute_scale_factor_and_num_records(cdb_t *cdb, bool is_counter, int64_t *num_records, long *factor) {
 
-    if (*num_records != 0) {
+    if (is_counter) {
+        if (*num_records != 0) {
 
-        if (*num_records > 0) {
-            *num_records += 1;
-        } else {
-            *num_records -= 1;
+            if (*num_records > 0) {
+                *num_records += 1;
+            } else {
+                *num_records -= 1;
+            }
         }
     }
 
@@ -722,7 +724,7 @@ double cdb_get_statistic(cdb_range_t *range, cdb_statistics_enum_t type) {
 }
 
 static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, 
-    int cooked, uint64_t *num_recs, cdb_record_t **records) {
+    int cooked, long step, uint64_t *num_recs, cdb_record_t **records) {
 
     int64_t first_requested_logical_record;
     int64_t last_requested_logical_record;
@@ -862,12 +864,12 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
 
         if (strcmp(cdb->header->type, "counter") == 0) {
             is_counter = true;
+        }
 
-            if (_compute_scale_factor_and_num_records(cdb, &num_requested, &factor)) {
-                free(crecords);
-                free(buffer);
-                return cdb_error();
-            }
+        if (_compute_scale_factor_and_num_records(cdb, is_counter, &num_requested, &factor)) {
+            free(crecords);
+            free(buffer);
+            return cdb_error();
         }
 
         for (i = 0; i < *num_recs; i++) {
@@ -891,7 +893,7 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
                 prev_value = new_value;
             }
 
-            if (factor != 0) {
+            if (factor != 0 && is_counter) {
 
                 /* Skip the first entry, since it's absolute and is needed
                  * to calculate the second */
@@ -929,6 +931,57 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
         *num_recs = cooked_recs;
     }
 
+    /* If we've been requested to average the records & timestamps */
+    if (step > 1) {
+
+        cdb_record_t *arecords;
+        uint64_t step_recs = 0;
+        uint64_t leftover  = (*num_recs % step);
+        uint64_t i = 0;
+
+        if ((arecords = calloc((int)((*num_recs / step) + leftover), RECORD_SIZE)) == NULL) {
+            free(arecords);
+            free(buffer);
+            return CDB_ENOMEM;
+        }
+
+        /* Walk our liste of cooked records, jumping ahead by the given step.
+           For each set of records within that step, we want to get the average 
+           for those records and place them into a new array.
+         */
+        for (i = 0; i < *num_recs; i += step) {
+
+            int j  = 0;
+            double xi[step];
+            double yi[step];
+
+            for (j = 0; j < step; j++) {
+                xi[j] = (double)buffer[i+j].time;
+                yi[j] = buffer[i+j].value;
+            }
+
+            arecords[step_recs].time  = (time_t)gsl_stats_mean(xi, 1, step);
+            arecords[step_recs].value = gsl_stats_mean(yi, 1, step);
+            step_recs += 1;
+        }
+
+        /* Check for alignment */
+        if (leftover > 0) {
+            uint64_t leftover_start = *num_recs - leftover;
+
+            for (i = leftover_start; i < *num_recs; i++) {
+
+                arecords[step_recs].time  = buffer[i].time;
+                arecords[step_recs].value = buffer[i].value;
+                step_recs += 1;
+            }
+        }
+
+        free(buffer);
+        buffer = arecords;
+        *num_recs = step_recs;
+    }
+
     /* now pull out the number of requested records if asked */
     if (num_requested != 0 && *num_recs >= abs(num_requested)) {
 
@@ -959,11 +1012,11 @@ static int _cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_r
 }
 
 int cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, 
-    int cooked, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range) {
+    int cooked, long step, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range) {
 
-    int ret = CDB_SUCCESS;
+    int ret   = CDB_SUCCESS;
 
-    ret = _cdb_read_records(cdb, start, end, num_requested, cooked, num_recs, records);
+    ret = _cdb_read_records(cdb, start, end, num_requested, cooked, step, num_recs, records);
 
     if (ret == CDB_SUCCESS) {
 
@@ -979,14 +1032,14 @@ int cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested
 }
 
 void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, FILE *fh, 
-    const char *date_format, int cooked) {
+    const char *date_format, int cooked, long step) {
 
     uint64_t i = 0;
     uint64_t num_recs = 0;
     
     cdb_record_t *records = NULL;
 
-    if (_cdb_read_records(cdb, start, end, num_requested, cooked, &num_recs, &records) == CDB_SUCCESS) {
+    if (_cdb_read_records(cdb, start, end, num_requested, cooked, step, &num_recs, &records) == CDB_SUCCESS) {
 
         for (i = 0; i < num_recs; i++) {
 
@@ -1007,18 +1060,25 @@ void cdb_print(cdb_t *cdb) {
         cdb_print_header(cdb);
     }
 
-    printf("============== Records ================\n");
-    cdb_print_records(cdb, 0, 0, 0, stdout, date_format, 0);
-    printf("============== End ================\n");
+    if (strcmp(cdb->header->type, "counter") == 0) {
 
-    printf("============== Cooked Records ================\n");
-    cdb_print_records(cdb, 0, 0, 0, stdout, date_format, 1);
+        printf("============= Raw Counter Records =============\n");
+        cdb_print_records(cdb, 0, 0, 0, stdout, date_format, 0, 0);
+        printf("============== End Raw Counter Records ==============\n");
+
+        printf("============== Cooked Records ================\n");
+
+    } else {
+        printf("============== Records ================\n");
+    }
+
+    cdb_print_records(cdb, 0, 0, 0, stdout, date_format, 1, 0);
     printf("============== End ================\n");
 }
 
 /* Take in an array of cdbs */
 int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
-    int cooked, uint64_t *driver_num_recs, cdb_record_t **records, cdb_range_t *range) {
+    int cooked, long step, uint64_t *driver_num_recs, cdb_record_t **records, cdb_range_t *range) {
 
     uint64_t i = 0;
     int ret    = CDB_SUCCESS;
@@ -1030,7 +1090,7 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
     }
 
     /* The first cdb is the driver */
-    ret = _cdb_read_records(cdbs[0], start, end, num_requested, cooked, driver_num_recs, &driver_records);
+    ret = _cdb_read_records(cdbs[0], start, end, num_requested, cooked, step, driver_num_recs, &driver_records);
 
     if (ret != CDB_SUCCESS) {
         free(driver_records);
@@ -1077,7 +1137,7 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
 
         cdb_record_t *follower_records = NULL;
 
-        ret = _cdb_read_records(cdbs[i], start, end, num_requested, cooked, &follower_num_recs, &follower_records);
+        ret = _cdb_read_records(cdbs[i], start, end, num_requested, cooked, step, &follower_num_recs, &follower_records);
 
         /* Just bail, free all allocations below and let the error bubble up */
         if (ret != 0) break;
@@ -1131,7 +1191,7 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t 
 }
 
 void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
-    FILE *fh, const char *date_format, int cooked) {
+    FILE *fh, const char *date_format, int cooked, long step) {
 
     uint64_t i = 0;
     uint64_t num_recs = 0;
@@ -1139,7 +1199,7 @@ void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_
     cdb_record_t *records = NULL;
     cdb_range_t *range = calloc(1, sizeof(cdb_range_t));
 
-    cdb_read_aggregate_records(cdbs, num_cdbs, start, end, num_requested, cooked, &num_recs, &records, range);
+    cdb_read_aggregate_records(cdbs, num_cdbs, start, end, num_requested, cooked, step, &num_recs, &records, range);
 
     for (i = 0; i < num_recs; i++) {
 

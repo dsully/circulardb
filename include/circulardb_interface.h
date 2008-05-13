@@ -137,22 +137,22 @@ double cdb_get_statistic(cdb_range_t *range, cdb_statistics_enum_t type);
 
 /* Return CDB_SUCCESS, CDB_ENOMEM, CDB_ETMRANGE, CDB_ENORECS or errno */
 int cdb_read_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested,
-    int cooked, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range);
+    int cooked, long step, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range);
 
 void cdb_print_header(cdb_t * cdb);
 
 void cdb_print_records(cdb_t *cdb, time_t start, time_t end, int64_t num_requested, FILE *fh, 
-    const char *date_format, int cooked);
+    const char *date_format, int cooked, long step);
 
 void cdb_print(cdb_t *cdb);
 
 /* Aggregation interface */
 /* Return CDB_SUCCESS, CDB_ENOMEM, CDB_ETMRANGE, CDB_ENORECS, CDB_EINTERPD, CDB_EINTERPF or errno */
 int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
-    int cooked, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range);
+    int cooked, long step, uint64_t *num_recs, cdb_record_t **records, cdb_range_t *range);
 
 void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, time_t start, time_t end, int64_t num_requested,
-    FILE *fh, const char *date_format, int cooked);
+    FILE *fh, const char *date_format, int cooked, long step);
 
 #endif
 
