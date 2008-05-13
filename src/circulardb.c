@@ -1134,10 +1134,6 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *reques
 
     gsl_interp_init(interp, driver_x_values, driver_y_values, *driver_num_recs);
 
-    /* restrict to the driver's time range */
-    if (request->start == 0) request->start = driver_records[0].time;
-    if (request->end   == 0) request->end   = driver_records[*driver_num_recs-1].time;
-
     for (i = 1; i < num_cdbs; i++) {
 
         uint64_t j = 0;
