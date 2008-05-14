@@ -34,7 +34,7 @@ module CircularDB
     # GNUPlot 4.2 adds: filledcurves & histograms. Common usage would be:
     # 'filledcurves above x1'
     attr_accessor :style, :title, :fix_logscale, :output_format, :show_data, :show_trend, :logscale, :debug
-    attr_accessor :start_time, :end_time, :size, :aggregate
+    attr_accessor :start_time, :end_time, :size, :aggregate, :average
     attr_reader :output, :size, :cdbs
 
     def initialize(output = nil, start_time = nil, end_time = nil, cdbs = [])
@@ -45,6 +45,7 @@ module CircularDB
       end
 
       @legend_max = SMALL_LEGEND_MAX_SIZE
+      @cooked     = true
 
       self.output       = output
       self.start_time   = start_time
@@ -186,7 +187,6 @@ module CircularDB
       x_start  = 0
       x_end    = 0
       num_plots = 0
-      for_graphing = 1
 
       labels = Hash.new
       axes   = Hash.new
@@ -227,7 +227,7 @@ module CircularDB
             records = []
       
             begin
-              records = cdb.read_records(@start_time, @end_time, nil, for_graphing)
+              records = cdb.read_records(@start_time, @end_time, nil, @cooked, @average)
             rescue RuntimeError => e
               if retries < 10 and cdb.respond_to?('reorder')
                 cdb.reorder
@@ -317,16 +317,10 @@ module CircularDB
               x = []
               y = []
 
-              #if @show_trend
-              #  left  = records.size-1
-              #  average(records, x, y, 160, left)
-
-              #else
-                records.each do |r|
-                  x << r[0]
-                  y << r[1] / div
-                end
-              #end
+              records.each do |r|
+                x << r[0]
+                y << r[1] / div
+              end
 
               plot.data << Gnuplot::DataSet.new([x, y]) do |ds|
 
@@ -337,7 +331,6 @@ module CircularDB
                   ds.using = "1:#{yaxis} axes #{axis}"
                 elsif @show_trend
                   ds.using = "1:#{yaxis} smooth bezier axes #{axis}"
-                  #ds.using = "1:#{yaxis} axes #{axis}"
                 end
               end
 
@@ -364,7 +357,6 @@ module CircularDB
             return
           end
 
-          custom_format = false
           ranges  = Hash.new
           formats = Hash.new
 
@@ -377,11 +369,11 @@ module CircularDB
             end
 
             # Default plot format - rounds to whole numbers and kilo/mega
-            if units =~ /bytes per/
+            if units =~ /\bbytes\b/
               formats[axis] = "\"%5.0s %cB\""
-            elsif units =~ /bits per/
+            elsif units =~ /\bbits\b/
               formats[axis] = "\"%5.0s %cb\""
-            elsif units == "percent"
+            elsif units =~ /percent/
               ranges[axis]  = "[0:100]"
               formats[axis] = "\"%3.0s %%\""
             elsif units == "milliseconds"
@@ -427,25 +419,6 @@ module CircularDB
 
     end
 
-    # Quick hack (till it can make it in C) to generate 
-    def average(records, x, y, step, left)
-
-      (0..left).step(step) do |i|
-
-        xi = []
-        yi = []
-
-        records[i,step].each do |r|
-          xi << r[0]
-          yi << r[1]
-        end
-
-        x << xi.mean
-        y << yi.mean
-        left -= step
-      end
-    end
-
     def close
       @cdbs.values.each { |cdb| cdb.close }
       @cdbs = nil
@@ -481,18 +454,6 @@ module CircularDB
 end
 
 class Array
-
-  def sum
-    inject(0) { |sum, x| sum ? sum + x : x }
-  end
-
-  def mean
-    return 0 if self.size == 0
-    sum = 0
-    self.each { |v| sum += v }
-    sum / self.size.to_f
-  end
-
   def to_gplot_fast
     self.collect { |a| a.join(" ") }.join("\n") + "\ne"
   end

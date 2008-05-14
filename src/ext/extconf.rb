@@ -1,10 +1,16 @@
-#!/usr/bin/ruby
+#!/usr/bin/env ruby
 
 require 'mkmf'
 
 # Ugh. Hardcoded.
-$CFLAGS  << " -I/p/include/circulardb-0"
-$LDFLAGS << " -L/p/lib"
+
+if ARGV[0] == "local"
+  $CFLAGS  << " -I/home/dan/dev/circulardb/include"
+  $LDFLAGS << " -L/home/dan/dev/circulardb/src/.libs"
+else
+  $CFLAGS  << " -I/p/include/circulardb-0"
+  $LDFLAGS << " -L/p/lib"
+end
 
 exit unless have_header("circulardb.h")
 exit unless have_library("circulardb", "cdb_new", "circulardb.h")

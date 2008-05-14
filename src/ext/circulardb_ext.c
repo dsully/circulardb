@@ -207,9 +207,26 @@ static VALUE _set_header(VALUE self, VALUE name, VALUE value) {
     return value;
 }
 
+cdb_request_t _parse_cdb_request(VALUE start, VALUE end, VALUE count, VALUE cooked, VALUE step) {
+
+    cdb_request_t request = cdb_new_request();
+
+    /* cooked defaults to true from cdb_new_request() */
+    if (NIL_P(cooked) || cooked == Qfalse) {
+        request.cooked = 0;
+    }
+
+    if (!NIL_P(start)) request.start = NUM2UINT(start);
+    if (!NIL_P(end))   request.end   = NUM2UINT(end);
+    if (!NIL_P(count)) request.count = rb_num2ull(count);
+    if (!NIL_P(step))  request.step  = NUM2LONG(step);
+
+    return request;
+}
+
 static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
 
-    VALUE start, end, num_req, cooked, array;
+    VALUE start, end, count, cooked, step, array;
 
     uint64_t i   = 0;
     uint64_t cnt = 0;
@@ -219,25 +236,13 @@ static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
     cdb_range_t *range    = _new_statistics(self);
     cdb_record_t *records = NULL;
 
-    rb_scan_args(argc, argv, "04", &start, &end, &num_req, &cooked);
+    rb_scan_args(argc, argv, "05", &start, &end, &count, &cooked, &step);
 
-    if (NIL_P(start))   start   = INT2FIX(0);
-    if (NIL_P(end))     end     = INT2FIX(0);
-    if (NIL_P(num_req)) num_req = INT2FIX(0);
-    if (NIL_P(cooked))  cooked  = INT2FIX(0);
+    cdb_request_t request = _parse_cdb_request(start, end, count, cooked, step);
 
     Data_Get_Struct(self, cdb_t, cdb);
 
-    ret = cdb_read_records(
-        cdb,
-        NUM2UINT(start),
-        NUM2UINT(end),
-        rb_num2ull(num_req),
-        NUM2UINT(cooked),
-        &cnt,
-        &records,
-        range
-    );
+    ret = cdb_read_records(cdb, &request, &cnt, &records, range);
 
     _check_return(ret);
 
@@ -354,7 +359,9 @@ static VALUE cdb_rb_discard_records_in_time_range(VALUE self, VALUE start_time, 
     Data_Get_Struct(self, cdb_t, cdb);
     uint64_t cnt = 0;
 
-    int ret = cdb_discard_records_in_time_range(cdb, NUM2ULONG(start_time), NUM2ULONG(end_time), &cnt);
+    cdb_request_t request = _parse_cdb_request(start_time, end_time, Qnil, Qnil, Qnil);
+
+    int ret = cdb_discard_records_in_time_range(cdb, &request, &cnt);
 
     _check_return(ret);
 
@@ -433,15 +440,12 @@ static VALUE cdb_rb_print_header(VALUE self) {
 
 static VALUE cdb_rb_print_records(int argc, VALUE *argv, VALUE self) {
 
-    VALUE start, end, num_req, file_obj, date_format, cooked;
+    VALUE start, end, count, file_obj, date_format, cooked, step;
     cdb_t *cdb;
 
-    rb_scan_args(argc, argv, "06", &start, &end, &num_req, &file_obj, &date_format, &cooked);
+    rb_scan_args(argc, argv, "06", &start, &end, &count, &file_obj, &date_format, &cooked, &step);
 
-    if (NIL_P(start))   start   = INT2FIX(0);
-    if (NIL_P(end))     end     = INT2FIX(0);
-    if (NIL_P(num_req)) num_req = INT2FIX(0);
-    if (NIL_P(cooked)) cooked   = INT2FIX(0);
+    cdb_request_t request = _parse_cdb_request(start, end, count, cooked, step);
 
     if (NIL_P(date_format)) {
         date_format = rb_str_new2("");
@@ -453,15 +457,7 @@ static VALUE cdb_rb_print_records(int argc, VALUE *argv, VALUE self) {
 
     Data_Get_Struct(self, cdb_t, cdb);
 
-    cdb_print_records(
-        cdb, 
-        NUM2UINT(start),
-        NUM2UINT(end),
-        rb_num2ull(num_req),
-        RFILE(file_obj)->fptr->f,
-        StringValuePtr(date_format),
-        NUM2UINT(cooked)
-    );
+    cdb_print_records(cdb, &request, RFILE(file_obj)->fptr->f, StringValuePtr(date_format));
 }
 
 static VALUE cdb_rb_statistics(int argc, VALUE *argv, VALUE self) {
@@ -560,7 +556,7 @@ static VALUE cdb_agg_rb_initialize(VALUE self, VALUE name) {
 
 static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
 
-    VALUE start, end, num_req, cooked, array;
+    VALUE start, end, count, cooked, step, array;
     VALUE cdb_objects = rb_iv_get(self, "@cdbs");
 
     uint64_t i   = 0;
@@ -573,12 +569,9 @@ static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
     cdb_record_t *records = NULL;
     cdb_range_t *range    = _new_statistics(self);
 
-    rb_scan_args(argc, argv, "04", &start, &end, &num_req, &cooked);
+    rb_scan_args(argc, argv, "05", &start, &end, &count, &cooked, &step);
 
-    if (NIL_P(start))   start   = INT2FIX(0);
-    if (NIL_P(end))     end     = INT2FIX(0);
-    if (NIL_P(num_req)) num_req = INT2FIX(0);
-    if (NIL_P(cooked))  cooked  = INT2FIX(0);
+    cdb_request_t request = _parse_cdb_request(start, end, count, cooked, step);
 
     /* First, loop over the incoming array of CircularDB::Storage objects and
      * extract the pointers to the cdb_t structs. */
@@ -586,17 +579,7 @@ static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
         Data_Get_Struct(RARRAY(cdb_objects)->ptr[i], cdb_t, cdbs[i]);
     }
 
-    ret = cdb_read_aggregate_records(
-        cdbs,
-        num_cdbs,
-        NUM2UINT(start),
-        NUM2UINT(end),
-        rb_num2ull(num_req),
-        NUM2UINT(cooked),
-        &cnt,
-        &records,
-        range
-    );
+    ret = cdb_read_aggregate_records(cdbs, num_cdbs, &request, &cnt, &records, range);
 
     _check_return(ret);
 
@@ -613,7 +596,7 @@ static VALUE cdb_agg_rb_read_records(int argc, VALUE *argv, VALUE self) {
 
 static VALUE cdb_agg_rb_print_records(int argc, VALUE *argv, VALUE self) {
 
-    VALUE start, end, num_req, file_obj, date_format, cooked;
+    VALUE start, end, count, file_obj, date_format, cooked, step;
     VALUE cdb_objects = rb_iv_get(self, "@cdbs");
 
     uint64_t i   = 0;
@@ -622,12 +605,9 @@ static VALUE cdb_agg_rb_print_records(int argc, VALUE *argv, VALUE self) {
     /* initialize the cdbs array to the size of the cdb_objects array */
     cdb_t *cdbs[num_cdbs];
 
-    rb_scan_args(argc, argv, "06", &start, &end, &num_req, &file_obj, &date_format, &cooked);
+    rb_scan_args(argc, argv, "07", &start, &end, &count, &file_obj, &date_format, &cooked, &step);
 
-    if (NIL_P(start))   start   = INT2FIX(0);
-    if (NIL_P(end))     end     = INT2FIX(0);
-    if (NIL_P(num_req)) num_req = INT2FIX(0);
-    if (NIL_P(cooked))  cooked  = INT2FIX(0);
+    cdb_request_t request = _parse_cdb_request(start, end, count, cooked, step);
 
     if (NIL_P(date_format)) {
         date_format = rb_str_new2("");
@@ -643,16 +623,7 @@ static VALUE cdb_agg_rb_print_records(int argc, VALUE *argv, VALUE self) {
         Data_Get_Struct(RARRAY(cdb_objects)->ptr[i], cdb_t, cdbs[i]);
     }
 
-    cdb_print_aggregate_records(
-        cdbs,
-        num_cdbs,
-        NUM2UINT(start),
-        NUM2UINT(end),
-        rb_num2ull(num_req),
-        RFILE(file_obj)->fptr->f,
-        StringValuePtr(date_format),
-        NUM2UINT(cooked)
-    );
+    cdb_print_aggregate_records(cdbs, num_cdbs, &request, RFILE(file_obj)->fptr->f, StringValuePtr(date_format));
 }
 
 static VALUE cdb_agg_rb_statistics(int argc, VALUE *argv, VALUE self) {

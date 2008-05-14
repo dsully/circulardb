@@ -1,3 +1,7 @@
+Version 0.1.18 (dan)
+	* Sync to circulardb 0.1.15 API
+	* Allows averaging of data on extraction.
+
 Version 0.1.17 (dan)
 	* More tweaks to graph scaling.
 

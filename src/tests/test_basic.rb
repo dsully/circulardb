@@ -107,4 +107,37 @@ class TestCircularDB < Test::Unit::TestCase
 
     cdb.close
   end
+
+  def test_step
+    cdb = CircularDB::Storage.new(@file, File::CREAT|File::RDWR|File::EXCL, nil, @name, 180000, "gauge")
+    assert(cdb)
+
+    records = Array.new
+    start   = 1190860358
+
+    20.times { |i| records.push([ start+i, i.to_f ]) }
+
+    assert_equal(20, cdb.write_records(records))
+
+    read = cdb.read_records(0, 0, 0, true, 5)
+
+    # for first 5, should have time of 1190860360 and value of 2
+    # for next  5, should have time of 1190860365 and value of 7
+    assert_equal(4, read.size)
+
+    assert_equal(1190860360, read[0][0])
+    assert_equal(2, read[0][1])
+
+    assert_equal(1190860365, read[1][0])
+    assert_equal(7, read[1][1])
+
+    assert_equal(1190860370, read[2][0])
+    assert_equal(12, read[2][1])
+
+    assert_equal(1190860375, read[3][0])
+    assert_equal(17, read[3][1])
+
+    cdb.close
+  end
+
 end

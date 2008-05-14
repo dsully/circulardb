@@ -48,7 +48,7 @@ class TestAggregateCircularDB < Test::Unit::TestCase
     assert_equal(10, read.length)
     assert_equal(10, agg.num_records)
 
-    (0..9).each do |i|
+    10.times do |i|
       assert_equal((i+1)*3, read[i][1])
     end
 
