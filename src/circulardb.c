@@ -936,7 +936,8 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
         cdb_record_t *arecords;
         long     step      = request->step;
         uint64_t step_recs = 0;
-        uint64_t leftover  = (*num_recs % request->step);
+        uint64_t leftover  = (*num_recs % step);
+        uint64_t walkend   = (*num_recs - leftover);
         uint64_t i = 0;
 
         if ((arecords = calloc((int)((*num_recs / step) + leftover), RECORD_SIZE)) == NULL) {
@@ -945,13 +946,13 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
             return CDB_ENOMEM;
         }
 
-        /* Walk our liste of cooked records, jumping ahead by the given step.
+        /* Walk our list of cooked records, jumping ahead by the given step.
            For each set of records within that step, we want to get the average 
            for those records and place them into a new array.
          */
-        for (i = 0; i < *num_recs; i += step) {
+        for (i = 0; i < walkend; i += step) {
 
-            int j  = 0;
+            int j = 0;
             double xi[step];
             double yi[step];
 
@@ -1146,15 +1147,10 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *reques
         /* Just bail, free all allocations below and let the error bubble up */
         if (ret != 0) break;
 
-        if (follower_num_recs <= 1) {
-            //ret = CDB_EINTERPF;
-            continue;
-        }
-
         for (j = 0; j < *driver_num_recs; j++) {
 
             /* Check for out of bounds */
-            if (j > follower_num_recs) {
+            if (j >= follower_num_recs) {
                 break;
             }
 
