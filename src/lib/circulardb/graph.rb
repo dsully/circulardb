@@ -11,15 +11,23 @@ module CircularDB
     rescue LoadError
     end
 
+    begin
+      require 'facets/more/times'
+    rescue LoadError
+      require 'facets/times'
+    end
+
     LEGEND_MAX_SIZE = 128
     SMALL_LEGEND_MAX_SIZE = 48
-    ONE_HOUR  = 60 * 60
-    VERA_FONT = '/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf' 
 
-    if File.exists?(VERA_FONT)
-      FONT = "font '#{VERA_FONT},9'"
-    else
-      FONT = ""
+    # Look for a better font - Linux & Darwin
+    ["/usr/share/fonts/bitstream-vera/Vera.ttf", "/usr/X11/lib/X11/fonts/TTF/Vera.ttf"].each do |f|
+      if File.exists?(f)
+        @@font = "font '#{f},9'"
+        break
+      else
+        @@font = ""
+      end
     end
 
     @@gnuplot_fh = nil
@@ -34,7 +42,7 @@ module CircularDB
     # GNUPlot 4.2 adds: filledcurves & histograms. Common usage would be:
     # 'filledcurves above x1'
     attr_accessor :style, :title, :fix_logscale, :output_format, :show_data, :show_trend, :logscale, :debug
-    attr_accessor :start_time, :end_time, :size, :aggregate, :average
+    attr_accessor :start_time, :end_time, :size, :aggregate, :average, :font
     attr_reader :output, :size, :cdbs
 
     def initialize(output = nil, start_time = nil, end_time = nil, cdbs = [])
@@ -102,6 +110,11 @@ module CircularDB
         end
 
         name.gsub!(/Circular DB/, '')
+        name.gsub!(/^Mount Used: /, '')
+        name.gsub!(/^System Utilized: /, '')
+        name.gsub!(/^CPU Time for IO: /, '')
+        name.gsub!(/^Average \w+ \w+: /, '')
+        name.gsub!(/^(?:Read|Write) Requests: /, '')
 
         if cdb.type == "counter"
           name << " (#{cdb.units})"
@@ -154,7 +167,7 @@ module CircularDB
         @size = [700,350]
       end
 
-      plot.terminal "#{@output_format || 'png'} transparent size #{@size.join(',')} enhanced #{FONT}"
+      plot.terminal "#{@output_format || 'png'} transparent size #{@size.join(',')} enhanced #{@font || @@font}"
 
       if @output
 
@@ -382,13 +395,10 @@ module CircularDB
               formats[axis] = "\"%3.2f s\""
             elsif units =~ /degrees/
               formats[axis] = "\"%3.1s #{176.chr}\""
-            elsif units =~ /per sec/ or units == "qps"
-            else
-              formats[axis] = "\"%5.0s %c\""
             end
 
             if formats[axis].nil?
-              labels[axis] = "\"#{units}\""
+              labels[axis] = "'#{units}'"
             end
 
             if axis =~ /y1/
@@ -398,14 +408,11 @@ module CircularDB
             else
               plot.format "y2 #{formats[axis]}"
               plot.y2range ranges[axis]
-              plot.y2label  labels[axis]
-              #plot.y2label "\"#{units}\""
-              #plot.y2label y2label
+              plot.y2label labels[axis]
               plot.y2tics
             end
           end
 
-          plot.xrange "[\"#{x_start}\":\"#{x_end}\"]"
           set_x_format(plot, x_start, x_end, labels["x1y1"])
         end
       end
@@ -426,29 +433,31 @@ module CircularDB
 
     def set_x_format(plot, x_start, x_end, ylabel)
       format = nil
+      xtics  = nil
+      delta  = x_end - x_start
 
-      # for plots longer than a quarter, skip day and hour information
-      if (x_end - x_start <= 2 * ONE_HOUR)
+      if (delta <= 2.hours)
         format = ":%M"
-      elsif (x_end - x_start <= 24 * ONE_HOUR)
-        format = "%H"
-      elsif (x_end - x_start <= 30 * ONE_HOUR)
-        format  = "%H:%M\\n%m/%d"
-      elsif (x_end - x_start <= 9 * 24 * ONE_HOUR)
-        if ylabel =~ /per day/
-          format = "%b %d"
-        else
-          format = "%H\\n%d"
-        end
-      elsif (x_end - x_start <= 35 * 24 * ONE_HOUR)
-        format = "%b %d"
-      elsif (x_end - x_start <= 4 * 31 * 24 * ONE_HOUR)
-        format = "%b %d"
+        xtics  = 5.minutes
+      elsif (delta <= 1.5.days)
+        format = "%H:%M"
+        xtics  = 3.hours
+      elsif (delta <= 8.days)
+        format = "%a %d"
+      elsif (delta <= 35.days)
+        format = "Week %U"
+        xtics  = 1.week
+      elsif (delta <= 124.days)
+        format = "%b"
+        xtics  = 2.weeks
       else
-        format = "%m/%y"
+        format = "%m"
+        xtics  = 2.months
       end
 
+      plot.xtics xtics if xtics
       plot.format "x \"#{format}\""
+      plot.xrange "[\"#{x_start}\":\"#{x_end}\"]"
     end
   end
 end

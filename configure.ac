@@ -3,14 +3,14 @@ dnl - It should be specified as major.minor.revision [1.3.0]
 dnl - The third argument, should be replaced with the package 
 dnl - maintainers email address.
 
-AC_INIT([rubygem_circulardb], [0.1.18], [dan@powerset.com])
+AC_INIT([rubygem_circulardb], [0.1.19], [dan@powerset.com])
 SHORT_DESCRIPTION="CircularDB Ruby Bindings"
 
 dnl - The following prerequisites line can be used to specify
 dnl - the exact, or minimum, versions of packages on which this
 dnl - package will depend (for build _and_ runtime)
 
-RUNTIME_PREREQUISITES="powerset_ruby, powerset_rubygems, circulardb-0 >= 0.1.15, rubygem_gnuplot, gnuplot"
+RUNTIME_PREREQUISITES="circulardb-0 >= 0.1.15, rubygem_gnuplot, gnuplot, bitstream-vera-fonts, rubygem_facets"
 
 dnl - The following prerequisites line can be used to specify
 dnl - the exact, or minimum, versions of packages on which this

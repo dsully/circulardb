@@ -1,3 +1,8 @@
+Version 0.1.19 (dan)
+	* Tweaks to X label & tics.
+	* Require proper bitstream vera fonts package and locations.
+	* Require facets.
+
 Version 0.1.18 (dan)
 	* Sync to circulardb 0.1.15 API
 	* Allows averaging of data on extraction.
