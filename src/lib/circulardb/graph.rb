@@ -325,7 +325,7 @@ module CircularDB
 
               # Divide by number of cdbs (aggregate) or 1.0 (single).
               # If the caller has asked for a sum (aggregate), rather than the average.
-              div = aggregate.eql?(:sum) ? 1.0 : cdb.size
+              div = @aggregate == :sum ? 1.0 : cdb.size
 
               x = []
               y = []
@@ -395,10 +395,13 @@ module CircularDB
               formats[axis] = "\"%3.2f s\""
             elsif units =~ /degrees/
               formats[axis] = "\"%3.1s #{176.chr}\""
+            elsif units =~ /per sec/ or units == "qps"
+            else
+              formats[axis] = "\"%5.0s %c\""
             end
 
             if formats[axis].nil?
-              labels[axis] = "'#{units}'"
+              labels[axis] = "\"#{units}\""
             end
 
             if axis =~ /y1/
@@ -408,7 +411,9 @@ module CircularDB
             else
               plot.format "y2 #{formats[axis]}"
               plot.y2range ranges[axis]
-              plot.y2label labels[axis]
+              plot.y2label  labels[axis]
+              #plot.y2label "\"#{units}\""
+              #plot.y2label y2label
               plot.y2tics
             end
           end
@@ -457,6 +462,7 @@ module CircularDB
 
       plot.xtics xtics if xtics
       plot.format "x \"#{format}\""
+      plot.xlabel "Generated: #{Time.now}"
       plot.xrange "[\"#{x_start}\":\"#{x_end}\"]"
     end
   end

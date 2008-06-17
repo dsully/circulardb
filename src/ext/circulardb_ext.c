@@ -213,7 +213,7 @@ cdb_request_t _parse_cdb_request(VALUE start, VALUE end, VALUE count, VALUE cook
 
     /* cooked defaults to true from cdb_new_request() */
     if (NIL_P(cooked) || cooked == Qfalse) {
-        request.cooked = 0;
+        request.cooked = false;
     }
 
     if (!NIL_P(start)) request.start = NUM2UINT(start);
@@ -251,6 +251,48 @@ static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
     for (i = 0; i < cnt; i++) {
         rb_ary_store(array, i, rb_ary_new3(2, ULONG2NUM(records[i].time), rb_float_new(records[i].value)));
     }
+
+    free(records);
+
+    _cdb_rb_update_header_hash(self, cdb);
+
+    return array;
+}
+
+/* get back the data in a way that's friendly to gnuplot.rb */
+static VALUE cdb_rb_read_records_cp(int argc, VALUE *argv, VALUE self) {
+
+    VALUE start, end, count, cooked, step, aggregate, array, x, y;
+
+    uint64_t i   = 0;
+    uint64_t cnt = 0;
+    uint64_t agg = 0;
+    int      ret = 0;
+
+    cdb_t *cdb;
+    cdb_range_t *range    = _new_statistics(self);
+    cdb_record_t *records = NULL;
+
+    rb_scan_args(argc, argv, "06", &start, &end, &count, &cooked, &step, &aggregate);
+
+    cdb_request_t request = _parse_cdb_request(start, end, count, cooked, step);
+
+    Data_Get_Struct(self, cdb_t, cdb);
+
+    agg = rb_num2ull(aggregate);
+    ret = cdb_read_records(cdb, &request, &cnt, &records, range);
+
+    _check_return(ret);
+
+    x = rb_ary_new2(cnt);
+    y = rb_ary_new2(cnt);
+
+    for (i = 0; i < cnt; i++) {
+        rb_ary_store(x, i, ULONG2NUM(records[i].time));
+        rb_ary_store(y, i, rb_float_new(records[i].value / agg));
+    }
+
+    array = rb_ary_new3(2, x, y);
 
     free(records);
 
@@ -735,6 +777,7 @@ void Init_circulardb_ext() {
     rb_define_method(cStorage, "close", cdb_rb_close_cdb, 0); 
     rb_define_method(cStorage, "read_header", cdb_rb_read_header, 0); 
     rb_define_method(cStorage, "read_records", cdb_rb_read_records, -1); 
+    rb_define_method(cStorage, "read_records_gp", cdb_rb_read_records_cp, -1); 
     rb_define_method(cStorage, "write_header", cdb_rb_write_header, 0); 
     rb_define_method(cStorage, "write_record", cdb_rb_write_record, 2); 
     rb_define_method(cStorage, "write_records", cdb_rb_write_records, 1); 

@@ -1,3 +1,8 @@
+Version 0.1.20 (dan)
+	* Add generated date to graphs. [MISIX-30]
+	* Add (currently unused) read_records_gp() for gnuplot.rb
+	* Unit fixes.
+
 Version 0.1.19 (dan)
 	* Tweaks to X label & tics.
 	* Require proper bitstream vera fonts package and locations.
