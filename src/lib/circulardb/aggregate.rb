@@ -37,8 +37,8 @@ module CircularDB
           end
         end
 
-        # Smallest number of records is the driver.
-        @cdbs = cdbs.sort { |a,b| a.num_records <=> b.num_records }.collect { |r| r }
+        # Largest number of records is the driver.
+        @cdbs = cdbs.sort { |a,b| b.num_records <=> a.num_records }.collect { |r| r }
       end
 
       @cdbs

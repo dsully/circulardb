@@ -5,6 +5,7 @@ module CircularDB
     require 'rubygems'
     require 'fileutils'
     require 'tempfile'
+    #require 'tzinfo'
 
     begin
       require 'gnuplot'
@@ -71,6 +72,10 @@ module CircularDB
       #end
     end
 
+    def title=(string)
+      @title = string.gsub(/_/, '-')
+    end
+
     # Takes a hash of name => cdb
     def add_cdbs(cdbs)
 
@@ -109,7 +114,7 @@ module CircularDB
           name = "#{cdb.filename.split(/\//)[-2]} #{name} #{cdb.description}"
         end
 
-        name.gsub!(/Circular DB/, '')
+        name.gsub!(/Circular DB/, ' ')
         name.gsub!(/^Mount Used: /, '')
         name.gsub!(/^System Utilized: /, '')
         name.gsub!(/^CPU Time for IO: /, '')
@@ -257,6 +262,11 @@ module CircularDB
               next
             end
 
+            # Aggregate data can trickle in, causing odd data. Slice off the last 5 records
+            if cdb.kind_of?(CircularDB::Aggregate)
+              #records.slice!(-5)
+            end
+
             if records.empty? or records.first.nil?
               puts "Busted read_records for: #{cdb.filename}" if @debug
               plots -= 1
@@ -272,10 +282,10 @@ module CircularDB
 
             real_start = records.first.first
             real_end   = records.last.first
-            stats      = cdb.statistics
 
             # Check for empty and bogus values.
-            sum = stats.sum
+            #sum = cdb.statistics.sum
+            sum = records[1].sum
 
             if sum.kind_of?(Float) and sum.nan?
               puts "Sum is NaN for: #{cdb.filename}"
@@ -395,7 +405,7 @@ module CircularDB
               formats[axis] = "\"%3.2f s\""
             elsif units =~ /degrees/
               formats[axis] = "\"%3.1s #{176.chr}\""
-            elsif units =~ /per sec/ or units == "qps"
+            elsif units =~ /per sec/ or units == "qps" or units == "requests"
             else
               formats[axis] = "\"%5.0s %c\""
             end
@@ -436,6 +446,13 @@ module CircularDB
       @cdbs = nil
     end
 
+    def utc2local(t)
+      ENV["TZ"] = 'US/Pacific'
+      res = t.getlocal
+      ENV["TZ"] = "UTC"
+      res
+    end
+
     def set_x_format(plot, x_start, x_end, ylabel)
       format = nil
       xtics  = nil
@@ -448,7 +465,8 @@ module CircularDB
         format = "%H:%M"
         xtics  = 3.hours
       elsif (delta <= 8.days)
-        format = "%a %d"
+        format = "%a %d\\n%H:%M"
+        xtics  = 6.hours
       elsif (delta <= 35.days)
         format = "Week %U"
         xtics  = 1.week
@@ -460,9 +478,13 @@ module CircularDB
         xtics  = 2.months
       end
 
+      #now = Time.now
+      #off = now.to_i - utc2local(now).to_i
+
       plot.xtics xtics if xtics
       plot.format "x \"#{format}\""
-      plot.xlabel "Generated: #{Time.now}"
+      plot.x2label "'Generated: #{Time.now}"
+      #plot.xlabel "\"Generated: #{now}\\n#{TZInfo::Timezone.get('US/Pacific').utc_to_local(now)}\""
       plot.xrange "[\"#{x_start}\":\"#{x_end}\"]"
     end
   end
@@ -471,5 +493,9 @@ end
 class Array
   def to_gplot_fast
     self.collect { |a| a.join(" ") }.join("\n") + "\ne"
+  end
+
+  def sum
+    inject(0) { |sum, x| sum ? sum + x.abs : x.abs }
   end
 end

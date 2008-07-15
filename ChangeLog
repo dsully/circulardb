@@ -1,3 +1,8 @@
+Version 0.1.21 (dan)
+	* Add TZ code for potential future graphs
+	* Reorder aggregate CDBs
+	* Add comparison method.
+
 Version 0.1.20 (dan)
 	* Add generated date to graphs. [MISIX-30]
 	* Add (currently unused) read_records_gp() for gnuplot.rb

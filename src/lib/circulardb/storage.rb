@@ -16,6 +16,10 @@ module CircularDB
       METH
     end
 
+    def <=>(cdb)
+      cdb.num_records
+    end
+
     def last_updated
       File.stat(self.filename).mtime.to_i
     end
