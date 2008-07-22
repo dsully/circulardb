@@ -106,8 +106,6 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
     VALUE header = rb_hash_new();
     VALUE filename, flags, mode, name, max_records, num_records, type, units, desc;
 
-    char *regex = ALLOCA_N(char, 4);
-
     rb_scan_args(argc, argv, "17", &filename, &flags, &mode, &name, &max_records, &type, &units, &desc);
 
     Data_Get_Struct(self, cdb_t, cdb);
@@ -500,6 +498,8 @@ static VALUE cdb_rb_print_records(int argc, VALUE *argv, VALUE self) {
     Data_Get_Struct(self, cdb_t, cdb);
 
     cdb_print_records(cdb, &request, RFILE(file_obj)->fptr->f, StringValuePtr(date_format));
+
+    return self;
 }
 
 static VALUE cdb_rb_statistics(int argc, VALUE *argv, VALUE self) {
@@ -666,6 +666,8 @@ static VALUE cdb_agg_rb_print_records(int argc, VALUE *argv, VALUE self) {
     }
 
     cdb_print_aggregate_records(cdbs, num_cdbs, &request, RFILE(file_obj)->fptr->f, StringValuePtr(date_format));
+
+    return self;
 }
 
 static VALUE cdb_agg_rb_statistics(int argc, VALUE *argv, VALUE self) {
