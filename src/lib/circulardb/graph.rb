@@ -43,7 +43,7 @@ module CircularDB
     # GNUPlot 4.2 adds: filledcurves & histograms. Common usage would be:
     # 'filledcurves above x1'
     attr_accessor :style, :title, :fix_logscale, :output_format, :show_data, :show_trend, :logscale, :debug
-    attr_accessor :start_time, :end_time, :size, :aggregate, :average, :font
+    attr_accessor :start_time, :end_time, :size, :aggregate, :average, :font, :minimal, :colors
     attr_reader :output, :size, :cdbs
 
     def initialize(output = nil, start_time = nil, end_time = nil, cdbs = [])
@@ -172,7 +172,7 @@ module CircularDB
         @size = [700,350]
       end
 
-      plot.terminal "#{@output_format || 'png'} transparent size #{@size.join(',')} enhanced #{@font || @@font}"
+      plot.terminal "#{@output_format || 'png'} size #{@size.join(',')} enhanced nocrop #{@font || @@font}"
 
       if @output
 
@@ -231,8 +231,13 @@ module CircularDB
             plot.title @title
           end
 
+          if @minimal
+            plot.key "off"
+          else
+            plot.key "below horizontal"
+          end
+
           plot.grid
-          plot.key "below horizontal"
           plot.xdata "time"
           plot.timefmt '"%s"'
 
@@ -405,9 +410,8 @@ module CircularDB
               formats[axis] = "\"%3.2f s\""
             elsif units =~ /degrees/
               formats[axis] = "\"%3.1s #{176.chr}\""
-            elsif units =~ /per sec/ or units == "qps" or units == "requests"
-            else
-              formats[axis] = "\"%5.0s %c\""
+            #else
+            #  formats[axis] = "\"%5.0s %c\""
             end
 
             if formats[axis].nil?
@@ -417,11 +421,11 @@ module CircularDB
             if axis =~ /y1/
               plot.format "y #{formats[axis]}"
               plot.yrange  ranges[axis]
-              plot.ylabel  labels[axis]
+              plot.ylabel  labels[axis] unless @minimal
             else
               plot.format "y2 #{formats[axis]}"
               plot.y2range ranges[axis]
-              plot.y2label  labels[axis]
+              plot.y2label  labels[axis] unless @minimal
               #plot.y2label "\"#{units}\""
               #plot.y2label y2label
               plot.y2tics
@@ -460,13 +464,13 @@ module CircularDB
 
       if (delta <= 2.hours)
         format = ":%M"
-        xtics  = 5.minutes
+        xtics  = 10.minutes
       elsif (delta <= 1.5.days)
         format = "%H:%M"
         xtics  = 3.hours
       elsif (delta <= 8.days)
         format = "%a %d\\n%H:%M"
-        xtics  = 6.hours
+        xtics  = 18.hours
       elsif (delta <= 35.days)
         format = "Week %U"
         xtics  = 1.week
@@ -483,7 +487,7 @@ module CircularDB
 
       plot.xtics xtics if xtics
       plot.format "x \"#{format}\""
-      plot.x2label "'Generated: #{Time.now}"
+      plot.x2label "'Generated: #{Time.now}" unless @minimal
       #plot.xlabel "\"Generated: #{now}\\n#{TZInfo::Timezone.get('US/Pacific').utc_to_local(now)}\""
       plot.xrange "[\"#{x_start}\":\"#{x_end}\"]"
     end

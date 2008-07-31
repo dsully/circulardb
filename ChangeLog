@@ -1,3 +1,6 @@
+Version 0.1.22 (dan)
+	* Add "minimal" flag for small graphs to remove extra text.
+
 Version 0.1.21 (dan)
 	* Add TZ code for potential future graphs
 	* Reorder aggregate CDBs
