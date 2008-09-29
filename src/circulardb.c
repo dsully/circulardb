@@ -1215,7 +1215,8 @@ void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *requ
     free(records);
 }
 
-void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, int type, char* units, int interval) {
+void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, int type, 
+    char* units, uint64_t min_value, uint64_t max_value, int interval) {
 
     if (max_records == 0) {
         max_records = CDB_DEFAULT_RECORDS;
@@ -1242,10 +1243,10 @@ void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, int type,
     cdb->header->type         = type        || CDB_DEFAULT_DATA_TYPE;
     cdb->header->interval     = interval;
     cdb->header->max_records  = max_records;
+    cdb->header->min_value    = min_value;
+    cdb->header->max_value    = max_value;
     cdb->header->num_records  = 0;
     cdb->header->start_record = 0;
-    cdb->header->min_value    = 0;
-    cdb->header->max_value    = 0;
 }
 
 cdb_t* cdb_new(void) {

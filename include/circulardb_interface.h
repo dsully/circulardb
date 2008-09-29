@@ -145,7 +145,8 @@ int cdb_read_header(cdb_t *cdb);
 /* Return CDB_SUCCESS, CDB_ERDONLY or errno */
 int cdb_write_header(cdb_t *cdb);
 
-void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, int type, char* units, int interval);
+void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, int type, 
+    char* units, uint64_t min_value, uint64_t max_value, int interval);
 
 /* Return CDB_SUCCESS, CDB_ERDONLY, CDB_EINVMAX or errno */
 int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t *num_recs);
