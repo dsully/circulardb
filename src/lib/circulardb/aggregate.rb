@@ -60,6 +60,18 @@ module CircularDB
       @cdbs[0].read_records(0, 0, 0)[-1][0]
     end
 
+    def min_value
+      @cdbs[0].min_value
+    end
+
+    def max_value
+      @cdbs[0].max_value
+    end
+
+    def interval
+      @cdbs[0].interval
+    end
+
     def num_records
       @cdbs[0].num_records
     end

@@ -27,11 +27,14 @@ class TestCircularDB < Test::Unit::TestCase
 
   def test_create
     cdb = CircularDB::Storage.new(@file, File::CREAT|File::RDWR|File::EXCL, nil, @name)
+    cdb.max_value = 100
     assert(cdb)
     assert_equal(cdb.filename, @file)
     assert_equal(cdb.name, @name)
-    assert_equal(cdb.type, "gauge")
+    assert_equal(cdb.type, :gauge)
     assert_equal(cdb.units, "absolute")
+    assert_equal(cdb.min_value, 0)
+    assert_equal(cdb.max_value, 100)
     cdb.close
   end
 
@@ -40,13 +43,23 @@ class TestCircularDB < Test::Unit::TestCase
     records = Array.new
     now     = Time.now
 
+    flags       = File::CREAT|File::RDWR|File::EXCL
+    mode        = nil
+    max_records = nil
+    type        = :gauge
+    units       = "absolute"
+    min_value   = 0
+    max_value   = 99
+    interval    = 300
+
     (1..10).each { |i|
       records.push([ now, i.to_f ])
       now += 1
     }
 
-    cdb = CircularDB::Storage.new(@file, File::CREAT|File::RDWR|File::EXCL, nil, @name)
+    cdb = CircularDB::Storage.new(@file, flags, mode, @name, max_records, type, units, min_value, max_value, interval)
     assert(cdb)
+    assert_equal(cdb.max_value, max_value)
 
     assert_equal(10, cdb.write_records(records))
 
@@ -85,7 +98,7 @@ class TestCircularDB < Test::Unit::TestCase
   end
 
   def test_counter_reset
-    cdb = CircularDB::Storage.new(@file, File::CREAT|File::RDWR|File::EXCL, nil, @name, 180000, "counter")
+    cdb = CircularDB::Storage.new(@file, File::CREAT|File::RDWR|File::EXCL, nil, @name, nil, :counter)
     assert(cdb)
 
     records = Array.new
@@ -109,7 +122,7 @@ class TestCircularDB < Test::Unit::TestCase
   end
 
   def test_step
-    cdb = CircularDB::Storage.new(@file, File::CREAT|File::RDWR|File::EXCL, nil, @name, 180000, "gauge")
+    cdb = CircularDB::Storage.new(@file, File::CREAT|File::RDWR|File::EXCL, nil, @name, nil, :gauge)
     assert(cdb)
 
     records = Array.new

@@ -83,7 +83,7 @@ module CircularDB
 
       cdbs.each_pair do |name,cdb|
 
-        #if cdb.type == "counter"
+        #if cdb.type == :counter
         #  name = "#{name} (#{cdb.units})"
         #end
 
@@ -121,7 +121,7 @@ module CircularDB
         name.gsub!(/^Average \w+ \w+: /, '')
         name.gsub!(/^(?:Read|Write) Requests: /, '')
 
-        if cdb.type == "counter"
+        if cdb.type == :counter
           name << " (#{cdb.units})"
         end
 

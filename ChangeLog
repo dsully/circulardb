@@ -1,3 +1,6 @@
+Version 0.2.0 (dan)
+	* Sync to CDB 0.2.0 change
+	
 Version 0.1.22 (dan)
 	* Add "minimal" flag for small graphs to remove extra text.
 

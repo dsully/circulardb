@@ -10,6 +10,9 @@
 #include <circulardb.h>
 #include <fcntl.h>
 
+#define RCDB_WRITE  0
+#define RCDB_UPDATE 1
+
 /* TODO handle clone/dup */
 
 static VALUE mCircularDB;
@@ -100,13 +103,32 @@ void _cdb_rb_update_header_hash(VALUE self, cdb_t *cdb) {
     rb_hash_aset(header, ID2SYM(rb_intern("num_records")), ULL2NUM(cdb->header->num_records));
 }
 
+int _cdb_type_from_symbol(VALUE symbol) {
+    if (strcmp(rb_id2name(SYM2ID(symbol)), "gauge") == 0) {
+        return CDB_TYPE_GAUGE;
+    } else if (strcmp(rb_id2name(SYM2ID(symbol)), "counter") == 0) {
+        return CDB_TYPE_COUNTER;
+    }
+
+    return CDB_DEFAULT_DATA_TYPE;
+}
+
+VALUE _symbol_from_cdb_type(int type) {
+    switch (type) {
+        case CDB_TYPE_GAUGE:
+            return ID2SYM(rb_intern("gauge"));
+        case CDB_TYPE_COUNTER:
+            return ID2SYM(rb_intern("counter"));
+    };
+}
+
 static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
 
     cdb_t *cdb;
     VALUE header = rb_hash_new();
-    VALUE filename, flags, mode, name, max_records, num_records, type, units, desc;
+    VALUE filename, flags, mode, name, max_records, num_records, type, units, min_value, max_value, interval;
 
-    rb_scan_args(argc, argv, "17", &filename, &flags, &mode, &name, &max_records, &type, &units, &desc);
+    rb_scan_args(argc, argv, "19", &filename, &flags, &mode, &name, &max_records, &type, &units, &min_value, &max_value, &interval);
 
     Data_Get_Struct(self, cdb_t, cdb);
 
@@ -129,19 +151,23 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
         }
 
         name         = rb_str_new2(cdb->header->name);
-        type         = rb_str_new2(cdb->header->type);
+        type         = _symbol_from_cdb_type(cdb->header->type);
         units        = rb_str_new2(cdb->header->units);
-        desc         = rb_str_new2(cdb->header->description);
         max_records  = ULL2NUM(cdb->header->max_records);
         num_records  = ULL2NUM(cdb->header->num_records);
+        min_value    = ULL2NUM(cdb->header->min_value);
+        max_value    = ULL2NUM(cdb->header->max_value);
+        interval     = ULL2NUM(cdb->header->interval);
 
     } else {
 
         if (NIL_P(max_records)) max_records = INT2FIX(0);
-        if (NIL_P(desc))  desc  = rb_str_new2("");
+        if (NIL_P(interval)) interval       = INT2FIX(0);
+        if (NIL_P(min_value)) min_value     = INT2FIX(0);
+        if (NIL_P(max_value)) max_value     = INT2FIX(0);
 
-        if (NIL_P(type) || (strcmp(StringValuePtr(type), "") == 0)) {
-            type  = rb_str_new2(CDB_DEFAULT_DATA_TYPE);
+        if (NIL_P(type)) {
+            type = _symbol_from_cdb_type(CDB_DEFAULT_DATA_TYPE);
         }
 
         if (NIL_P(units) || (strcmp(StringValuePtr(units), "") == 0)) {
@@ -151,9 +177,11 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
         cdb_generate_header(cdb,
             StringValuePtr(name),
             rb_num2ull(max_records),
-            StringValuePtr(type),
+            _cdb_type_from_symbol(type),
             StringValuePtr(units),
-            StringValuePtr(desc)
+            rb_num2ull(min_value),
+            rb_num2ull(max_value),
+            NUM2INT(interval)
         );
 
         num_records = INT2FIX(0);
@@ -168,7 +196,9 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
     rb_hash_aset(header, ID2SYM(rb_intern("units")), units);
     rb_hash_aset(header, ID2SYM(rb_intern("num_records")), num_records);
     rb_hash_aset(header, ID2SYM(rb_intern("max_records")), max_records);
-    rb_hash_aset(header, ID2SYM(rb_intern("description")), desc);
+    rb_hash_aset(header, ID2SYM(rb_intern("min_value")), min_value);
+    rb_hash_aset(header, ID2SYM(rb_intern("max_value")), max_value);
+    rb_hash_aset(header, ID2SYM(rb_intern("interval")), interval);
 
     rb_iv_set(self, "@header", header);
     rb_iv_set(self, "@statistics", Qnil);
@@ -183,16 +213,28 @@ static VALUE _set_header(VALUE self, VALUE name, VALUE value) {
 
     Data_Get_Struct(self, cdb_t, cdb);
 
-    if (strcmp(StringValuePtr(name), "description") == 0) {
-
-        rb_hash_aset(header, ID2SYM(rb_intern("description")), value);
-        strncpy(cdb->header->description, StringValuePtr(value), sizeof(cdb->header->description));
-        cdb->synced = false;
-
-    } else if (strcmp(StringValuePtr(name), "name") == 0) {
+    if (strcmp(StringValuePtr(name), "name") == 0) {
 
         rb_hash_aset(header, ID2SYM(rb_intern("name")), value);
         strncpy(cdb->header->name, StringValuePtr(value), sizeof(cdb->header->name));
+        cdb->synced = false;
+
+    } else if (strcmp(StringValuePtr(name), "min_value") == 0) {
+
+        rb_hash_aset(header, ID2SYM(rb_intern("min_value")), value);
+        cdb->header->min_value = rb_num2ull(value);
+        cdb->synced = false;
+
+    } else if (strcmp(StringValuePtr(name), "max_value") == 0) {
+
+        rb_hash_aset(header, ID2SYM(rb_intern("max_value")), value);
+        cdb->header->max_value = rb_num2ull(value);
+        cdb->synced = false;
+
+    } else if (strcmp(StringValuePtr(name), "interval") == 0) {
+
+        rb_hash_aset(header, ID2SYM(rb_intern("interval")), value);
+        cdb->header->interval = rb_num2ull(value);
         cdb->synced = false;
 
     } else if (strcmp(StringValuePtr(name), "units") == 0) {
@@ -330,7 +372,7 @@ static VALUE _cdb_write_or_update_records(VALUE self, VALUE array, int type) {
         records[i].value = value == Qnil ? CDB_NAN : NUM2DBL(value);
     }
 
-    if (type == 1) {
+    if (type == RCDB_WRITE) {
         ret = cdb_write_records(cdb, records, len, &cnt);
     } else {
         ret = cdb_update_records(cdb, records, len, &cnt);
@@ -358,7 +400,7 @@ static VALUE _cdb_write_or_update_record(VALUE self, VALUE time, VALUE value, in
         value = rb_float_new(CDB_NAN);
     }
 
-    if (type == 1) {
+    if (type == RCDB_WRITE) {
         ret = cdb_write_record(cdb, _parse_time(time), NUM2DBL(value));
     } else {
         ret = cdb_update_record(cdb, _parse_time(time), NUM2DBL(value));
@@ -375,22 +417,22 @@ static VALUE _cdb_write_or_update_record(VALUE self, VALUE time, VALUE value, in
 
 static VALUE cdb_rb_write_records(VALUE self, VALUE array) {
 
-    return _cdb_write_or_update_records(self, array, 1);
+    return _cdb_write_or_update_records(self, array, RCDB_WRITE);
 }
 
 static VALUE cdb_rb_write_record(VALUE self, VALUE time, VALUE value) {
 
-    return _cdb_write_or_update_record(self, time, value, 1);
+    return _cdb_write_or_update_record(self, time, value, RCDB_WRITE);
 }
 
 static VALUE cdb_rb_update_records(VALUE self, VALUE array) {
 
-    return _cdb_write_or_update_records(self, array, 2);
+    return _cdb_write_or_update_records(self, array, RCDB_UPDATE);
 }
 
 static VALUE cdb_rb_update_record(VALUE self, VALUE time, VALUE value) {
 
-    return _cdb_write_or_update_record(self, time, value, 2);
+    return _cdb_write_or_update_record(self, time, value, RCDB_UPDATE);
 }
 
 static VALUE cdb_rb_discard_records_in_time_range(VALUE self, VALUE start_time, VALUE end_time) {
@@ -729,18 +771,6 @@ static VALUE statistics_absdev(VALUE self) {
     return _cdb_rb_get_statistics(self, CDB_ABSDEV);
 }
 
-static VALUE statistics_variance(VALUE self) {
-    return _cdb_rb_get_statistics(self, CDB_VARIANCE);
-}
-
-static VALUE statistics_skew(VALUE self) {
-    return _cdb_rb_get_statistics(self, CDB_SKEW);
-}
-
-static VALUE statistics_kurtosis(VALUE self) {
-    return _cdb_rb_get_statistics(self, CDB_KURTOSIS);
-}
-
 static VALUE statistics_95th(VALUE self) {
     return _cdb_rb_get_statistics(self, CDB_95TH);
 }
@@ -812,9 +842,6 @@ void Init_circulardb_ext() {
     rb_define_method(cStatistics, "max", statistics_max, 0); 
     rb_define_method(cStatistics, "stddev", statistics_stddev, 0); 
     rb_define_method(cStatistics, "absdev", statistics_absdev, 0); 
-    rb_define_method(cStatistics, "variance", statistics_variance, 0); 
-    rb_define_method(cStatistics, "skew", statistics_skew, 0); 
-    rb_define_method(cStatistics, "kurtosis", statistics_kurtosis, 0); 
     rb_define_method(cStatistics, "pct95th", statistics_95th, 0); 
     rb_define_method(cStatistics, "pct75th", statistics_75th, 0); 
     rb_define_method(cStatistics, "pct50th", statistics_50th, 0); 
