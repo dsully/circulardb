@@ -265,6 +265,12 @@ int cdb_read_header(cdb_t *cdb) {
             return cdb_error();
         }
 
+        if (strncmp(cdb->header->token, CDB_TOKEN, 4) != 0) {
+            return cdb_error();
+        }
+
+        /* Do version check here? */
+
         cdb->synced = true;
 
         /* Calculate the number of records */
@@ -318,17 +324,22 @@ int cdb_write_header(cdb_t *cdb) {
 
 void cdb_print_header(cdb_t * cdb) {
 
-    printf("name: [%s]\n", cdb->header->name);
-    printf("desc: [%s]\n", cdb->header->description);
-    printf("unit: [%s]\n", cdb->header->units);
-    printf("type: [%s]\n", cdb->header->type);
     printf("version: [%s]\n", cdb->header->version);
-//    printf("min_value: [%g]\n", cdb->header->min_value);
-//    printf("max_value: [%g]\n", cdb->header->max_value);
+    printf("name: [%s]\n", cdb->header->name);
+    printf("units: [%s]\n", cdb->header->units);
+
+    switch (cdb->header->type) {
+        case CDB_TYPE_COUNTER:
+            printf("type: [COUNTER]\n");
+        case CDB_TYPE_GAUGE:
+            printf("type: [GAUGE]\n");
+    }
+
+    printf("min_value: [%g]\n", cdb->header->min_value);
+    printf("max_value: [%g]\n", cdb->header->max_value);
     printf("max_records: [%"PRIu64"]\n", cdb->header->max_records);
     printf("num_records: [%"PRIu64"]\n", cdb->header->num_records);
     printf("start_record: [%"PRIu64"]\n", cdb->header->start_record);
-    printf("last_updated: [%d]\n", (int)cdb->header->last_updated);
 }
 
 int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t *num_recs) {
@@ -573,9 +584,9 @@ int cdb_discard_records_in_time_range(cdb_t *cdb, cdb_request_t *request, uint64
     return CDB_SUCCESS;
 }
 
-static int _compute_scale_factor_and_num_records(cdb_t *cdb, bool is_counter, int64_t *num_records, long *factor) {
+static int _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_records, long *factor) {
 
-    if (is_counter) {
+    if (cdb->header->type == CDB_TYPE_COUNTER) {
         if (*num_records != 0) {
 
             if (*num_records > 0) {
@@ -654,9 +665,6 @@ void _compute_statistics(cdb_range_t *range, uint64_t *num_recs, cdb_record_t *r
     range->sum      = sum;
     range->stddev   = gsl_stats_sd(values, 1, valid);
     range->absdev   = gsl_stats_absdev(values, 1, valid);
-    range->variance = gsl_stats_variance(values, 1, valid);
-    range->skew     = gsl_stats_skew(values, 1, valid);
-    range->kurtosis = gsl_stats_kurtosis(values, 1, valid);
 
     /* The rest need sorted data */
     gsl_sort(values, 1, valid);
@@ -711,12 +719,6 @@ double cdb_get_statistic(cdb_range_t *range, cdb_statistics_enum_t type) {
             return range->stddev;
         case CDB_ABSDEV:
             return range->absdev;
-        case CDB_VARIANCE:
-            return range->variance;
-        case CDB_SKEW:
-            return range->skew;
-        case CDB_KURTOSIS:
-            return range->kurtosis;
         default:
             fprintf(stderr, "aggregate_using_function_for_records() function: [%d] not supported\n", type);
             return CDB_FAILURE;
@@ -846,8 +848,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
     /* Deal with cooking the output */
     if (request->cooked) {
 
-        bool is_counter = false;
-        //int check_min_max = 0;
+        bool check_min_max = true;
         long factor = 0;
         uint64_t i = 0;
         uint64_t cooked_recs = 0;
@@ -861,14 +862,14 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
             return CDB_ENOMEM;
         }
 
-        if (strcmp(cdb->header->type, "counter") == 0) {
-            is_counter = true;
-        }
-
-        if (_compute_scale_factor_and_num_records(cdb, is_counter, &request->count, &factor)) {
+        if (_compute_scale_factor_and_num_records(cdb, &request->count, &factor)) {
             free(crecords);
             free(buffer);
             return cdb_error();
+        }
+
+        if (cdb->header->min_value == 0 && cdb->header->max_value == 0) {
+            check_min_max = false;
         }
 
         for (i = 0; i < *num_recs; i++) {
@@ -876,7 +877,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
             time_t date  = buffer[i].time;
             double value = buffer[i].value;
 
-            if (is_counter) {
+            if (cdb->header->type == CDB_TYPE_COUNTER) {
                 double new_value = value;
                 value = CDB_NAN;
 
@@ -892,7 +893,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
                 prev_value = new_value;
             }
 
-            if (factor != 0 && is_counter) {
+            if (factor != 0 && cdb->header->type == CDB_TYPE_COUNTER) {
 
                 /* Skip the first entry, since it's absolute and is needed
                  * to calculate the second */
@@ -911,11 +912,12 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
             }
 
             /* Check for min/max boundaries */
-            /*if (check_min_max && !isnan(value)) {
+            /* Should this be done on write instead of read? */
+            if (check_min_max && !isnan(value)) {
                 if (value > cdb->header->max_value || value < cdb->header->min_value) {
                     value = CDB_NAN;
                 }
-            }*/
+            }
 
             /* Copy the munged data to our new array, since we might skip
              * elements. Also keep in mind mmap for the future */
@@ -1067,7 +1069,7 @@ void cdb_print(cdb_t *cdb) {
         cdb_print_header(cdb);
     }
 
-    if (strcmp(cdb->header->type, "counter") == 0) {
+    if (cdb->header->type == CDB_TYPE_COUNTER) {
 
         printf("============= Raw Counter Records =============\n");
         cdb_print_records(cdb, &request, stdout, date_format);
@@ -1213,42 +1215,37 @@ void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *requ
     free(records);
 }
 
-void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, char* type, char* units, char* description) {
-
-    memset(cdb->header->name, 0, sizeof(cdb->header->name));
-    memset(cdb->header->type, 0, sizeof(cdb->header->type));
-    memset(cdb->header->units, 0, sizeof(cdb->header->units));
-    memset(cdb->header->version, 0, sizeof(cdb->header->version));
-    memset(cdb->header->description, 0, sizeof(cdb->header->description));
+void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, int type, char* units, int interval) {
 
     if (max_records == 0) {
         max_records = CDB_DEFAULT_RECORDS;
     }
 
-    if (type == NULL || (strcmp(type, "") == 0)) {
-        type = (char*)CDB_DEFAULT_DATA_TYPE;
+    if (interval == 0) {
+        interval = CDB_DEFAULT_INTERVAL;
     }
 
     if (units == NULL || (strcmp(units, "") == 0)) {
         units = (char*)CDB_DEFAULT_DATA_UNIT;
     }
 
-    if (description == NULL || (strcmp(description, "") == 0)) {
-        sprintf(cdb->header->description, "Circular DB %s : %s with %"PRIu64" entries", name, type, max_records);
-    } else {
-        strncpy(cdb->header->description, description, strlen(description));
-    }
+    memset(cdb->header->name, 0, sizeof(cdb->header->name));
+    memset(cdb->header->units, 0, sizeof(cdb->header->units));
+    memset(cdb->header->version, 0, sizeof(cdb->header->version));
+    memset(cdb->header->token, 0, sizeof(cdb->header->token));
 
     strncpy(cdb->header->name, name, strlen(name));
     strncpy(cdb->header->units, units, strlen(units));
-    strncpy(cdb->header->type, type, strlen(type));
     strncpy(cdb->header->version, CDB_VERSION, strlen(CDB_VERSION));
+    strncpy(cdb->header->token, CDB_TOKEN, strlen(CDB_TOKEN));
 
-    cdb->header->max_records = max_records;
-    cdb->header->num_records = 0;
+    cdb->header->type         = type        || CDB_DEFAULT_DATA_TYPE;
+    cdb->header->interval     = interval;
+    cdb->header->max_records  = max_records;
+    cdb->header->num_records  = 0;
     cdb->header->start_record = 0;
-    //cdb->header->min_value = CDB_NAN;
-    //cdb->header->max_value = CDB_NAN;
+    cdb->header->min_value    = 0;
+    cdb->header->max_value    = 0;
 }
 
 cdb_t* cdb_new(void) {

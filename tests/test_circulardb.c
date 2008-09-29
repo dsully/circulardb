@@ -26,7 +26,7 @@ void teardown(void) {
     unlink(TEST_FILENAME);
 }
 
-cdb_t* create_cdb(const char* type, const char* unit, uint64_t max) {
+cdb_t* create_cdb(int type, const char* unit, uint64_t max) {
     cdb_t *cdb = cdb_new();
 
     if (max == 0) max = 500;
@@ -35,7 +35,7 @@ cdb_t* create_cdb(const char* type, const char* unit, uint64_t max) {
 
     cdb->flags = O_CREAT|O_RDWR;
     cdb_open(cdb);
-    cdb_generate_header(cdb, (char*)"test", max, (char*)type, (char*)unit, (char*)"");
+    cdb_generate_header(cdb, (char*)"test", max, type, (char*)unit, 0);
     cdb_write_header(cdb);
 
     return cdb;
@@ -43,12 +43,12 @@ cdb_t* create_cdb(const char* type, const char* unit, uint64_t max) {
 
 START_TEST (test_cdb_basic_create)
 {
-    cdb_t *cdb = create_cdb("gauge", "absolute", 0);
+    cdb_t *cdb = create_cdb(CDB_TYPE_GAUGE, "absolute", 0);
 
     if (!cdb) fail("cdb is null");
 
     fail_if(strcmp(cdb->header->name, "test") != 0, NULL);
-    fail_if(strcmp(cdb->header->type, "gauge") != 0, NULL);
+    fail_if(cdb->header->type != CDB_TYPE_GAUGE, NULL);
     fail_if(strcmp(cdb->header->units, "absolute") != 0, NULL);
 
     cdb_close(cdb);
@@ -67,7 +67,7 @@ START_TEST (test_cdb_basic_rw)
     cdb_record_t w_records[RECORD_SIZE * 10];
     cdb_record_t *r_records = NULL;
 
-    cdb_t *cdb = create_cdb("gauge", "absolute", 0);
+    cdb_t *cdb = create_cdb(CDB_TYPE_GAUGE, "absolute", 0);
 
     for (i = 0; i < 10; i++) {
         w_records[i].time  = i+1190860353;
@@ -209,7 +209,7 @@ START_TEST (test_cdb_aggregate_basic)
     cdb_record_t w_records[RECORD_SIZE * 10];
     cdb_record_t *r_records = NULL;
 
-    cdb_t *cdb = create_cdb("gauge", "absolute", 0);
+    cdb_t *cdb = create_cdb(CDB_TYPE_GAUGE, "absolute", 0);
 
     for (i = 0; i < 10; i++) {
         w_records[i].time  = i+1190860353;
@@ -274,7 +274,7 @@ START_TEST (test_cdb_overflow)
     cdb_range_t *range      = calloc(1, sizeof(cdb_range_t));
     uint64_t num_recs = 0;
 
-    cdb_t *cdb = create_cdb("counter", "requests per sec", 0);
+    cdb_t *cdb = create_cdb(CDB_TYPE_COUNTER, "requests per sec", 0);
 
     if (!cdb) fail("cdb is null");
 
@@ -305,7 +305,7 @@ START_TEST (test_cdb_wrap)
     cdb_range_t *range      = calloc(1, sizeof(cdb_range_t));
     uint64_t num_recs = 0;
 
-    cdb_t *cdb = create_cdb("gauge", "percent", 5);
+    cdb_t *cdb = create_cdb(CDB_TYPE_GAUGE, "percent", 5);
 
     if (!cdb) fail("cdb is null");
 
@@ -338,7 +338,7 @@ START_TEST (test_cdb_average)
 
     request.step = 5;
 
-    cdb_t *cdb = create_cdb("gauge", "percent", 20);
+    cdb_t *cdb = create_cdb(CDB_TYPE_GAUGE, "percent", 20);
 
     if (!cdb) fail("cdb is null");
 

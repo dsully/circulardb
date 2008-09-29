@@ -22,26 +22,45 @@ extern "C" {
 #include <stdio.h>
 #include <time.h>
 
+/* Add to ~/.magic:
+ *
+    0       string          CDB\0           CircularDB File
+    >4      string          >\0             Version '%s'
+    >10     string          >\0             Name '%s'
+    >138    string          >\0             Units '%s'
+    >202    byte            0               Type 'Gauge'
+    >202    byte            1               Type 'Counter'
+ */
+
+#define CDB_TOKEN   "CDB"
+#define CDB_VERSION "1.1.0"
+
 #define CDB_EXTENSION "cdb"
-#define CDB_VERSION "1.0"
-#define CDB_DEFAULT_DATA_TYPE "gauge"
 #define CDB_DEFAULT_DATA_UNIT "absolute"
-#define CDB_DEFAULT_RECORDS 180000
+#define CDB_DEFAULT_RECORDS 105120  // 1 year - 5 minute intervals
+#define CDB_DEFAULT_INTERVAL 60 * 5 // 5 minutes
 
 #define CDB_NAN (double)(0.0/0.0)
 
+enum cdb_type {
+    CDB_TYPE_GAUGE,
+    CDB_TYPE_COUNTER
+};
+
+#define CDB_DEFAULT_DATA_TYPE CDB_TYPE_GAUGE
+
 typedef struct cdb_header_s {
-    char name[80];
-    char description[120];
-    char units[80];
-    char type[40];
-    char version[10];
-//    double min_value;
-//    double max_value;
-    uint64_t max_records;
-    uint64_t num_records;
-    uint64_t start_record;
-    time_t last_updated; // deprecated - not used internally.
+    char        token[4];           // CDB 
+    char        version[6];         // 
+    char        name[128];          // "short name" for this database
+    char        units[64];          // bytes, percent, seconds, etc
+    int         type;               // Defined above
+    double      min_value;          // Values outside this range will be ignored/dropped
+    double      max_value;          // Set both to 0 to disable.
+    uint64_t    max_records;        // Maximum records this CDB can hold before cycling. 
+    int         interval;           // Interval that we expect to see data at.
+    uint64_t    start_record;       // Pointer to the logical start record
+    uint64_t    num_records;
 } cdb_header_t;
 
 typedef struct cdb_record_s {
@@ -86,9 +105,6 @@ typedef enum cdb_statistics_enum_s {
     CDB_MAD,
     CDB_STDDEV,
     CDB_ABSDEV,
-    CDB_VARIANCE,
-    CDB_SKEW,
-    CDB_KURTOSIS,
     CDB_95TH,
     CDB_75TH,
     CDB_50TH,
@@ -129,7 +145,7 @@ int cdb_read_header(cdb_t *cdb);
 /* Return CDB_SUCCESS, CDB_ERDONLY or errno */
 int cdb_write_header(cdb_t *cdb);
 
-void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, char* type, char* units, char* description);
+void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, int type, char* units, int interval);
 
 /* Return CDB_SUCCESS, CDB_ERDONLY, CDB_EINVMAX or errno */
 int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t *num_recs);
