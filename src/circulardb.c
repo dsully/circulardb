@@ -1102,6 +1102,7 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *reques
     ret = _cdb_read_records(cdbs[0], request, driver_num_recs, &driver_records);
 
     if (ret != CDB_SUCCESS) {
+        fprintf(stderr, "Bailed on: %s\n", cdbs[0]->filename);
         free(driver_records);
         return ret;
     }
@@ -1145,27 +1146,30 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *reques
         ret = _cdb_read_records(cdbs[i], request, &follower_num_recs, &follower_records);
 
         /* Just bail, free all allocations below and let the error bubble up */
-        if (ret != 0) break;
+        if (follower_num_recs != 0) {
 
-        for (j = 0; j < *driver_num_recs; j++) {
+            for (j = 0; j < *driver_num_recs; j++) {
 
-            /* Check for out of bounds */
-            if (j >= follower_num_recs) {
-                break;
+                /* Check for out of bounds */
+                if (j >= follower_num_recs) {
+                    break;
+                }
+
+                follower_x_values[j] = follower_records[j].time;
+                follower_y_values[j] = follower_records[j].value;
             }
 
-            follower_x_values[j] = follower_records[j].time;
-            follower_y_values[j] = follower_records[j].value;
-        }
+            for (j = 0; j < *driver_num_recs; j++) {
 
-        for (j = 0; j < *driver_num_recs; j++) {
+                double yi = gsl_interp_eval(interp, follower_x_values, follower_y_values, driver_x_values[j], accel);
 
-            double yi = gsl_interp_eval(interp, follower_x_values, follower_y_values, driver_x_values[j], accel);
-
-            if (isnormal(yi)) {
-                (*records)[j].value += yi;
+                if (isnormal(yi)) {
+                    (*records)[j].value += yi;
+                }
             }
         }
+
+        ret = CDB_SUCCESS;
 
         free(follower_records);
     }
