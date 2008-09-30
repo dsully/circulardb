@@ -10,4 +10,4 @@ PowerHoe.new('circulardb') do |p|
   p.spec_extras = {:extensions => ['ext/extconf.rb']}
 end
 
-# vim: syntax=Ruby
+# vim: syntax=ruby

@@ -4,13 +4,13 @@ module CircularDB
 
     require 'circulardb_ext'
 
-    [:name, :filename, :min_value, :max_value, :interval, :units, :type, :num_records].each do |meth|
+    [:name, :filename, :max_records, :min_value, :max_value, :interval, :units, :type, :num_records].each do |meth|
       class_eval <<-METH
         def #{meth}; @header[:#{meth}]; end
       METH
     end
 
-    [:name, :min_value, :max_value, :interval, :units, :type].each do |meth|
+    [:name, :max_records, :min_value, :max_value, :interval, :units, :type].each do |meth|
       class_eval <<-METH
         def #{meth}=(value); _set_header("#{meth}", value); end
       METH

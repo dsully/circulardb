@@ -115,11 +115,9 @@ int _cdb_type_from_symbol(VALUE symbol) {
 
 VALUE _symbol_from_cdb_type(int type) {
     switch (type) {
-        case CDB_TYPE_GAUGE:
-            return ID2SYM(rb_intern("gauge"));
-        case CDB_TYPE_COUNTER:
-            return ID2SYM(rb_intern("counter"));
-    };
+        case CDB_TYPE_GAUGE  : return ID2SYM(rb_intern("gauge"));
+        case CDB_TYPE_COUNTER: return ID2SYM(rb_intern("counter"));
+    }
 }
 
 static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
@@ -525,7 +523,7 @@ static VALUE cdb_rb_print_records(int argc, VALUE *argv, VALUE self) {
     VALUE start, end, count, file_obj, date_format, cooked, step;
     cdb_t *cdb;
 
-    rb_scan_args(argc, argv, "06", &start, &end, &count, &file_obj, &date_format, &cooked, &step);
+    rb_scan_args(argc, argv, "07", &start, &end, &count, &file_obj, &date_format, &cooked, &step);
 
     cdb_request_t request = _parse_cdb_request(start, end, count, cooked, step);
 
