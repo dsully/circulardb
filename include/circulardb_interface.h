@@ -24,12 +24,13 @@ extern "C" {
 
 /* Add to ~/.magic:
  *
-    0       string          CDB\0           CircularDB File
-    >4      string          >\0             Version '%s'
-    >10     string          >\0             Name '%s'
-    >138    string          >\0             Units '%s'
-    >202    byte            0               Type 'Gauge'
-    >202    byte            1               Type 'Counter'
+ * 0       string          CDB\0           CircularDB
+ * >4      string          >\0             v%s:
+ * >10     string          >\0             '%s',
+ * >138    string          >\0             '%s',
+ * >204    byte            0x02            gauge
+ * >204    byte            0x04            counter
+ *
  */
 
 #define CDB_TOKEN   "CDB"
