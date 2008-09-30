@@ -42,10 +42,8 @@ extern "C" {
 
 #define CDB_NAN (double)(0.0/0.0)
 
-enum cdb_type {
-    CDB_TYPE_GAUGE,
-    CDB_TYPE_COUNTER
-};
+#define CDB_TYPE_GAUGE 2
+#define CDB_TYPE_COUNTER 4
 
 #define CDB_DEFAULT_DATA_TYPE CDB_TYPE_GAUGE
 

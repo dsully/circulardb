@@ -328,11 +328,12 @@ void cdb_print_header(cdb_t * cdb) {
     printf("name: [%s]\n", cdb->header->name);
     printf("units: [%s]\n", cdb->header->units);
 
-    switch (cdb->header->type) {
-        case CDB_TYPE_COUNTER:
-            printf("type: [COUNTER]\n");
-        case CDB_TYPE_GAUGE:
-            printf("type: [GAUGE]\n");
+    if (cdb->header->type == CDB_TYPE_COUNTER) {
+        printf("type: [COUNTER]\n");
+    }
+
+    if (cdb->header->type == CDB_TYPE_GAUGE) {
+        printf("type: [GAUGE]\n");
     }
 
     printf("min_value: [%g]\n", cdb->header->min_value);
@@ -1226,6 +1227,10 @@ void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, int type,
         interval = CDB_DEFAULT_INTERVAL;
     }
 
+    if (type == 0) {
+        cdb->header->type = CDB_DEFAULT_DATA_TYPE;
+    }
+
     if (units == NULL || (strcmp(units, "") == 0)) {
         units = (char*)CDB_DEFAULT_DATA_UNIT;
     }
@@ -1240,7 +1245,7 @@ void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, int type,
     strncpy(cdb->header->version, CDB_VERSION, strlen(CDB_VERSION));
     strncpy(cdb->header->token, CDB_TOKEN, strlen(CDB_TOKEN));
 
-    cdb->header->type         = type        || CDB_DEFAULT_DATA_TYPE;
+    cdb->header->type         = type;
     cdb->header->interval     = interval;
     cdb->header->max_records  = max_records;
     cdb->header->min_value    = min_value;
