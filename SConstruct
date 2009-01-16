@@ -1,3 +1,7 @@
+# See also:
+# http://www.scons.org/doc/1.1.0/HTML/scons-user/x4032.html
+# http://www.scons.org/wiki/SconsRecipes
+
 env = Environment()
 env.Tool('packaging') 
 

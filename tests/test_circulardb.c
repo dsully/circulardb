@@ -174,9 +174,10 @@ START_TEST (test_cdb_basic_rw)
 
         cdb_read_records(cdb, &request, &num_recs, &r_records, range);
 
-        fail_unless(num_recs == 2, "Requested numreqs");
-        fail_unless(r_records[0].time == 1190860354, NULL);
-        fail_unless(r_records[1].time == 1190860355, NULL);
+        fail_unless(num_recs == 3, "Requested numreqs");
+        fail_unless(r_records[0].time == 1190860353, NULL);
+        fail_unless(r_records[1].time == 1190860354, NULL);
+        fail_unless(r_records[2].time == 1190860355, NULL);
     }
 
     {
@@ -190,7 +191,7 @@ START_TEST (test_cdb_basic_rw)
         cdb_read_records(cdb, &request, &num_recs, &r_records, range);
 
         fail_unless(num_recs == 1, "Requested numreqs");
-        fail_unless(r_records[0].time == 1190860354, NULL);
+        fail_unless(r_records[0].time == 1190860353, NULL);
     }
 
     free(range);
@@ -298,6 +299,48 @@ START_TEST (test_cdb_overflow)
 }
 END_TEST
 
+START_TEST (test_cdb_timefind)
+{
+    cdb_record_t *r_records = NULL;
+    cdb_request_t request   = cdb_new_request();
+    cdb_range_t *range      = calloc(1, sizeof(cdb_range_t));
+    uint64_t num_recs = 0;
+
+    int i = 0;
+    time_t start_time = 1222794797;
+
+    cdb_t *cdb = create_cdb(CDB_TYPE_GAUGE, "percent", 25000);
+
+    if (!cdb) fail("cdb is null");
+
+    for (i = 0; i < 40000; i++) {
+        cdb_write_record(cdb, start_time, i);
+        start_time += 300;
+    }
+
+    request.start  = 1232044053;
+    request.end    = 0;
+    request.count  = 0;
+    request.step   = 0;
+    request.cooked = true;
+
+    cdb_read_records(cdb, &request, &num_recs, &r_records, range);
+
+    //printf("requ: [%ld] num_recs: [%"PRIu64"]\n", request.start, num_recs);
+    //printf("time: [%ld] value: [%g]\n", r_records[0].time, r_records[0].value);
+    //printf("last: [%ld] value: [%g]\n", r_records[num_recs-1].time, r_records[num_recs-1].value);
+
+    fail_unless(r_records[0].time <= (request.start + 300));
+    fail_unless(r_records[0].time >= (request.start - 300));
+
+    free(range);
+    free(r_records);
+    cdb_close(cdb);
+    cdb_free(cdb);
+}
+END_TEST
+
+
 START_TEST (test_cdb_wrap)
 {
     cdb_record_t *r_records = NULL;
@@ -378,6 +421,7 @@ Suite* cdb_suite (void) {
     tcase_add_test(tc_core1, test_cdb_basic_create);
     tcase_add_test(tc_core1, test_cdb_basic_rw);
     tcase_add_test(tc_core1, test_cdb_overflow);
+    tcase_add_test(tc_core1, test_cdb_timefind);
     tcase_add_test(tc_core1, test_cdb_wrap);
     tcase_add_test(tc_core1, test_cdb_average);
     suite_add_tcase(s, tc_core1);

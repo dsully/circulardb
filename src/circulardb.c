@@ -132,7 +132,7 @@ static time_t _time_for_logical_record(cdb_t *cdb, int64_t logical_record) {
        Such datapoints in cdb indicate a corrupted cdb. */
     while (!time || time <= 0) {
 
-        if (_seek_to_logical_record(cdb, logical_record) == 0) {
+        if (_seek_to_logical_record(cdb, logical_record) < 0) {
             time = 0;
             break;
         }
@@ -161,8 +161,9 @@ static int64_t _logical_record_for_time(cdb_t *cdb, time_t req_time, int64_t sta
 
     /* for the very first time find start and end */
     if (start_logical_record == 0 && end_logical_record == 0) {
+
         start_logical_record = 0;
-        end_logical_record = num_recs - 1;
+        end_logical_record   = num_recs - 1;
 
         first_time = 1;
     } 
@@ -172,7 +173,7 @@ static int64_t _logical_record_for_time(cdb_t *cdb, time_t req_time, int64_t sta
         return start_logical_record;
     }
 
-    /* if there is 2 or 1 record in the search space, return the last */
+    /* if there are only 2 or 1 records in the search space, return the last record */
     if (end_logical_record - start_logical_record <= 1) {
         return end_logical_record;
     }
