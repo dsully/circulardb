@@ -111,13 +111,13 @@ static uint64_t _physical_record_for_logical_record(cdb_header_t *header, int64_
     return physical_record;
 }
 
-static uint64_t _seek_to_logical_record(cdb_t *cdb, int64_t logical_record) {
+static int64_t _seek_to_logical_record(cdb_t *cdb, int64_t logical_record) {
 
     uint64_t physical_record = _physical_record_for_logical_record(cdb->header, logical_record);
     uint64_t offset = HEADER_SIZE + (physical_record * RECORD_SIZE);
 
     if (lseek(cdb->fd, offset, SEEK_SET) != offset) {
-        return 0;
+        return -1;
     }
 
     return physical_record;
@@ -733,7 +733,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
     int64_t last_requested_logical_record;
     uint64_t last_requested_physical_record;
     int64_t seek_logical_record;
-    uint64_t seek_physical_record;
+    int64_t seek_physical_record;
 
     cdb_record_t *buffer = NULL;
 
