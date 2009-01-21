@@ -961,6 +961,13 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
             double yi[step];
 
             for (j = 0; j < step; j++) {
+
+                /* No NaNs on average - they make bogus graphs. Is there a
+                 * better value than 0 to use here? */
+                if (isnan(buffer[i+j].value)) {
+                    buffer[i+j].value = 0;
+                }
+
                 xi[j] = (double)buffer[i+j].time;
                 yi[j] = buffer[i+j].value;
             }
@@ -979,6 +986,13 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
             double yi[leftover];
 
             for (i = leftover_start; i < *num_recs; i++) {
+
+                /* No NaNs on average - they make bogus graphs. Is there a
+                 * better value than 0 to use here? */
+                if (isnan(buffer[i].value)) {
+                    buffer[i].value = 0;
+                }
+
                 xi[j] = (double)buffer[i].time;
                 yi[j] = buffer[i].value;
                 j++;
