@@ -970,16 +970,23 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
             step_recs += 1;
         }
 
-        /* Check for alignment */
+        /* Now collect from the last step point to the end and average. */
         if (leftover > 0) {
             uint64_t leftover_start = *num_recs - leftover;
 
-            for (i = leftover_start; i < *num_recs; i++) {
+            int j = 0;
+            double xi[leftover];
+            double yi[leftover];
 
-                arecords[step_recs].time  = buffer[i].time;
-                arecords[step_recs].value = buffer[i].value;
-                step_recs += 1;
+            for (i = leftover_start; i < *num_recs; i++) {
+                xi[j] = (double)buffer[i].time;
+                yi[j] = buffer[i].value;
+                j++;
             }
+
+            arecords[step_recs].time  = (time_t)gsl_stats_mean(xi, 1, j);
+            arecords[step_recs].value = gsl_stats_mean(yi, 1, j);
+            step_recs += 1;
         }
 
         free(buffer);
