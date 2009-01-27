@@ -33,6 +33,11 @@ static const char svnid[] __attribute__ ((unused)) = "$Id$";
 
 #include <circulardb_interface.h>
 
+/* Future win32 support */
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+
 /* DRK general: why not mmap the arena and treat it as an array to avoid all the "* RECORD_SIZE" */
 
 /* Save away errno so it doesn't get overwritten */
@@ -1305,7 +1310,7 @@ int cdb_open(cdb_t *cdb) {
 
         /* Default flags if none were set */
         if (cdb->flags == -1) {
-            cdb->flags = O_RDONLY;
+            cdb->flags = O_RDONLY|O_BINARY;
         }
 
         /* A cdb can't be write only - we need to read the header */
