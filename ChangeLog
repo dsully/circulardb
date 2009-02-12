@@ -1,0 +1,380 @@
+commit 57872f3fff66f28ff803f73568ca5adbbcea0196
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Thu Feb 12 03:24:11 2009 +0000
+
+    Add C/C++ implementations of cdb_read and cdb_validate.
+
+commit 76c475d6e9457b3d3f318fa67a5d09eb5fc3aff7
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Jan 27 20:43:41 2009 +0000
+
+    Open in binary mode. Future Windows compat.
+
+commit 1760f67dd426ef45c36492c31c7e44da8a3ff049
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Wed Jan 21 00:25:12 2009 +0000
+
+    No NaNs on average extractions.
+
+commit 457d39b1379727e0b8efe5f5d245c880ebbb6103
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Wed Jan 21 00:06:15 2009 +0000
+
+    Fix averaging of leftovers.
+
+commit 2451e718a0023f7a80823f5478894f7bea3fc93e
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Jan 20 23:14:32 2009 +0000
+
+    Use a signed int64 for error checking.
+
+commit 9ac66ad0c3c91cc6980314f8a0f93c2b1b98c3d7
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri Jan 16 20:04:58 2009 +0000
+
+    * Fix bug where if a start time was specified, a bogus record would be used.
+
+commit ae63ffd5d7fbfbb93a97d680893bb13096a26d01
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri Nov 7 23:15:07 2008 +0000
+
+    So it doesn't get lost.
+
+commit a12fe37de8d45a21039c620476e2b5f080d64148
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Sep 30 00:12:20 2008 +0000
+
+    Update magic
+
+commit 4cbf7ff49f3b2b33b57bc568244d66eab35ab878
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Sep 30 00:07:17 2008 +0000
+
+    Minor tweaks
+
+commit dd4b458fa289080a3e65c6725e596928f051b397
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Mon Sep 29 20:32:38 2008 +0000
+
+    Allow passing of min & max value
+
+commit 1800aa71c6d7e05b4dffe617059ff05e22009a2f
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Mon Sep 29 20:12:55 2008 +0000
+
+    * Refactor the header structure
+    * Allow min & max values to be set, along with a yet unused interval
+    * Use enum for CDB type
+    * Get rid of unused statistics types.
+
+commit 29763df9871a311f22acd0bddf349ea9b7601cb9
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Mon Sep 29 17:15:32 2008 +0000
+
+    Only aggregate records if there is follower data.
+
+commit c3966eb75ec50673926c6ce0b987715b4bbca1d7
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Wed May 14 18:05:18 2008 +0000
+
+    * Fix bounds errors with averaging.
+
+commit d876983c98ef35945e7cdaee0b52659cd2928f4a
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue May 13 23:53:20 2008 +0000
+
+    Remove aggregate time restriction - it should be handled at lower levels.
+
+commit 66fb47bcf6fd803ca90aa9e521606b5864a31fc3
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue May 13 20:52:02 2008 +0000
+
+    * Move the accumulating positional arguments into a cdb_request_t struct.
+
+commit d5203023c6c5c1b1b1dace9b8513cda9d85d8694
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue May 13 18:26:15 2008 +0000
+
+    * Allow optional step argument to average data on read/print extraction.
+    * Add tests for average data code.
+    * Don't print raw records for non-counter types.
+
+commit dd395b78d52d35c4cf772f54265277b6a8c0a256
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Sat May 10 17:47:01 2008 +0000
+
+    Fix segfault / out of bounds.
+
+commit 82ad4c7134f8c4a098055db70a9ffb7e436269c0
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri May 9 22:57:34 2008 +0000
+
+    Only calculate scale for counter types.
+
+commit a15b822eb80ff5a4cb407abb9182f56887deb486
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri May 9 19:00:09 2008 +0000
+
+    Add include for fstat()
+
+commit 4699684e466f022ed7ad3cdaccc486fe26b74e72
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri May 9 18:32:48 2008 +0000
+
+    * Calculate num_records instead of storing it in the header.
+      Saves a header rewrite for the common case.
+    
+    * Don't write last_updated to the header - let the FS/mtime deal with it.
+
+commit 4f6585dee5f1afb0fc28358e768bc65771aab096
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri May 9 17:28:06 2008 +0000
+
+    * Update write logic to handle multiple records in one pwrite().
+    * Turn off fdatasync() for now - it was causing moneypenny to become I/O bound.
+
+commit 6767c535316e7d673cc2269ae5ce3c435298cb8a
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Mon May 5 19:49:04 2008 +0000
+
+    Don't return an error if there are no follower records in the range - just
+    ignore it, treated as 0.
+
+commit 79274658c6ab2bcaf8c3ceb636c2478459a88050
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri May 2 17:04:55 2008 +0000
+
+    Restrict to the driver's time range.
+    
+    Fix crasher on aggregate print_records.
+
+commit b87d04e12e0d0db51fc508b60b5ac49ba53b16f7
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri Mar 7 23:45:32 2008 +0000
+
+    Minor fixes
+    
+    Fix fd close value.
+
+commit c70d5382d7bae1b941afb5d05f89f8d7d600a37a
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri Mar 7 22:35:46 2008 +0000
+
+    Add better error handling.
+
+commit 1bbac157f559659f4255eb0af1361aa1a3acfa87
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri Mar 7 17:17:45 2008 +0000
+
+    Minor tweaks
+
+commit 1239194c7c12d816b388c43174333e9c2b27be8e
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri Mar 7 16:19:13 2008 +0000
+
+    More fixes
+
+commit 090b6720b8708c1aeb70d90fa45b59419157e0fa
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri Mar 7 16:00:51 2008 +0000
+
+    First pass at fixing up return values.
+
+commit b6d0774ebecab46b37df7a031944b30b67ef4b4f
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Thu Mar 6 18:38:28 2008 +0000
+
+    Testing some Coverity fixes.
+
+commit c37da87528b31ac6d642f2ffcaa26f43061104fa
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Wed Mar 5 22:28:13 2008 +0000
+
+    * Ignore nan values for statistics
+
+commit c932cc8a815264d1ac8aefd4ac785bf5404c8ebc
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri Feb 29 22:55:39 2008 +0000
+
+    Fix factor check on Darwin, stop using GNU sscanf() extension.
+
+commit 2e63f7143cde661836682f44e72781f415b7a432
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri Feb 29 17:59:31 2008 +0000
+
+    Change invalid value to be NAN.
+    
+    Simplify counter wrap/reset logic.
+    
+    Add min/max values to header. (currently disabled)
+    
+    Fix debug statement.
+
+commit ad70baf067652954e99a4477806b26ddac540dcf
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Feb 26 23:52:06 2008 +0000
+
+    Add basic unit tests using Check
+
+commit 626646ff73b0700eb30625f5b0c22c6265e59c36
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Feb 26 19:20:41 2008 +0000
+
+    Assertion errors for aggregation.
+
+commit 1c7dc2fbe9cd38ca8d25b3bd360467b9e3bcbf29
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Thu Feb 21 07:11:30 2008 +0000
+
+    Fix statistics ordering
+
+commit 817e01debff2d19018668854b166977e2bdd5147
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Feb 19 22:23:21 2008 +0000
+
+    debug ifdefs
+
+commit 90563d307e21a3e42a9941684148828f541dd80d
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Feb 19 21:40:25 2008 +0000
+
+    * Create cdb_range_t which contains all the statistics for a particular range.
+      This allows only 1 read of the range.
+    
+    * Rename confusing cdb_aggregate_using_function_for_records() in favor of cdb_get_statistics()
+    
+    * Move to an enum over strings for compile time saftey.
+
+commit 59942e587fac461c74292fc0a3af10364feb2174
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Feb 19 18:53:17 2008 +0000
+
+    Checkpoint aggregate changes. More to come.
+
+commit 242bb6d98afc60dc1f6ca577d0bee49a828870a3
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Thu Feb 7 22:50:48 2008 +0000
+
+    * Use GSL to calculate median, skew, etc.
+
+commit bf07b91a404d11b02b03e1da95c59b3116d8d637
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Oct 30 18:34:06 2007 +0000
+
+    Check for fdatasync / fsync
+
+commit 98103dde01345fa25e1f9860ce86fdb2d0061a0e
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Wed Oct 17 22:22:46 2007 +0000
+
+    Use calloc() instead of malloc()
+    
+    Check for read & write flags.
+
+commit 6b46df375f8b44d75c4028bdcfcc7d3e8e412af5
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri Oct 12 00:08:52 2007 +0000
+
+    Handle things like "bytes per sec"
+
+commit f19ec659b36418bd084a97359e3254da53596ab4
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Thu Oct 11 21:17:03 2007 +0000
+
+    Fix multiple assignment issue.
+    
+    Allocated driver & follower arrays at runtime, constant can't be used at compile time.
+
+commit 6e575c36b38ac62927f54e1e3b95a42aba99c98a
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Thu Oct 11 01:23:20 2007 +0000
+
+    * Move gsl_interp_init() outside the loop.
+    * Skip over data files with less samples than the driver.
+    * Make sure that yi is a normal number.
+
+commit a7fac9f88be5eb637df1992d14a1ba43aab5adf0
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Wed Oct 10 18:18:12 2007 +0000
+
+    * Change aggregation API to require value with number of cdb_t's passed.
+
+commit 7c736a918ef48bf793d416785889467a5878e7bc
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Oct 9 22:28:09 2007 +0000
+
+    This works better (ie: doesn't segfault).
+
+commit 812a8feb6083f20f42a475366fae556464298baf
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Oct 9 22:21:08 2007 +0000
+
+    Check if free() needs to be called.
+
+commit 08e482e04626aa6490945d8584a7ed7427c5f4e9
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Oct 9 21:50:30 2007 +0000
+
+    Fix memory leak in cdb_aggregate_using_function_for_records()
+    
+    Initialize doubles to 0.0
+    
+    Make API consistent.
+
+commit f73f25d1d90b6b41644124017cb1487a807c171b
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Oct 9 18:33:38 2007 +0000
+
+    * Refactor cdb_read_records() to output cooked data. Simplifies cdb_print_records()
+    * Implement aggregation using GSL, much faster.
+    * Remove "event" type - unused.
+    * Fix date_format again.
+
+commit 89d7154ea5c1ec4ef2467e0246d43303d97aa2bb
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Thu Sep 27 07:12:40 2007 +0000
+
+    * Clear memory before using it.
+    * Sync to the filesystem after writing the header.
+
+commit f26b80195c4d4a6283a8aa2d87447042e98cb7cc
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Wed Sep 26 21:24:17 2007 +0000
+
+    * Expose cdb_open & cdb_close, so callers can set modes & flags.
+    * Handle counter wrap arounds
+    * Regex tweaks. Move ->synced setting.
+    * Fix description setting.
+    * More error handling that can be passed up to the Ruby layer.
+
+commit 9a71a7e614d6147057ec1a17df4904567e1561a9
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Sun Sep 23 00:49:41 2007 +0000
+
+    Return early if there are no records.
+
+commit bcc8e68abe619d7d69d066dbe8916966388a06a3
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Fri Sep 7 01:11:01 2007 +0000
+
+    Fix date_format.
+
+commit 5c7d78c0507575a34d61dd6f6af7d44b34d5c555
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Wed Sep 5 00:39:59 2007 +0000
+
+    Update to fix building on RedHat.
+    
+    Don't stomp the header file.
+
+commit b795e86f79db24e51100325e2e1b266897bab557
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Sep 4 22:34:50 2007 +0000
+
+    Missed header file.
+
+commit 14fc611210cc919e9cbc64512512e9f498d08bac
+Author: dsully <dsully@8368d6a0-ff38-4065-b5b8-cf688d7fb560>
+Date:   Tue Sep 4 22:29:43 2007 +0000
+
+    Initial commit of circulardb code.
