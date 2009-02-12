@@ -4,7 +4,7 @@
  */
 
 #ifndef LINT
-static const char svnid[] __attribute__ ((unused)) = "$Id$";
+static const char svnid[] __attribute__ ((unused)) = "$Id: circulardb.c 56215 2009-01-27 20:55:37Z dan $";
 #endif
 
 #include "config.h"
@@ -259,7 +259,7 @@ bool _cdb_is_writable(cdb_t *cdb) {
 
 int cdb_read_header(cdb_t *cdb) {
 
-    /* if the header has already been read from backing store do not read again */
+    /* If the header has already been read from backing store do not read again */
     if (cdb->synced == false) {
         struct stat st;
 
@@ -276,7 +276,6 @@ int cdb_read_header(cdb_t *cdb) {
         }
 
         /* Do version check here? */
-
         cdb->synced = true;
 
         /* Calculate the number of records */
