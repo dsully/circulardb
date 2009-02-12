@@ -116,6 +116,7 @@ module CircularDB
 
         name.gsub!(/Circular DB/, ' ')
         name.gsub!(/^Mount Used: /, '')
+        #name.gsub!(/^Disk Usage: /, '')
         name.gsub!(/^System Utilized: /, '')
         name.gsub!(/^CPU Time for IO: /, '')
         name.gsub!(/^Average \w+ \w+: /, '')
@@ -267,11 +268,6 @@ module CircularDB
               next
             end
 
-            # Aggregate data can trickle in, causing odd data. Slice off the last 5 records
-            if cdb.kind_of?(CircularDB::Aggregate)
-              #records.slice!(-5)
-            end
-
             if records.empty? or records.first.nil?
               puts "Busted read_records for: #{cdb.filename}" if @debug
               plots -= 1
@@ -288,16 +284,6 @@ module CircularDB
             real_start = records.first.first
             real_end   = records.last.first
 
-            # Check for empty and bogus values.
-            #sum = cdb.statistics.sum
-            sum = records[1].sum
-
-            if sum.kind_of?(Float) and sum.nan?
-              puts "Sum is NaN for: #{cdb.filename}"
-              plots -= 1
-              next
-            end
-
             axis = axes[cdb.units]
 
             unless axis
@@ -307,7 +293,7 @@ module CircularDB
 
             # Keep track of sum per axis for display purposes
             sums[axis] ||= 0.0
-            sums[axis] += sum
+            sums[axis] += records[1].sum
 
             # Data can be processed on the fly by gnuplot. in the "using 1:2"
             # statement, "2" represents the y value to be read (2 means here

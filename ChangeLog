@@ -1,3 +1,7 @@
+Version 0.2.1 (dan)
+	* Remove now uneeded bin/ programs (provided by CircularDB proper)
+	* Other misc cleanups.
+
 Version 0.2.0 (dan)
 	* Sync to CDB 0.2.0 change
 	

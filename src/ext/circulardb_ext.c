@@ -13,6 +13,10 @@
 #define RCDB_WRITE  0
 #define RCDB_UPDATE 1
 
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+
 /* TODO handle clone/dup */
 
 static VALUE mCircularDB;
@@ -572,7 +576,7 @@ static int _process_each_record(VALUE uuid, VALUE values, VALUE args) {
     uint64_t *t  = (uint64_t*)rb_ary_entry(args, 2);
 
     cdb_t *cdb = cdb_new();
-    cdb->flags = O_RDWR|O_CREAT;
+    cdb->flags = O_RDWR|O_CREAT|O_BINARY;
     cdb->mode  = -1;
 
     cdb_record_t *records = ALLOCA_N(cdb_record_t, len);
