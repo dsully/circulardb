@@ -1,0 +1,3 @@
+* Write bindings for Perl, Python
+
+* Explore using mmap() instead of pread/pwrite()

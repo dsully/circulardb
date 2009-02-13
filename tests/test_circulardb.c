@@ -35,7 +35,7 @@ cdb_t* create_cdb(int type, const char* unit, uint64_t max) {
 
     cdb->flags = O_CREAT|O_RDWR;
     cdb_open(cdb);
-    cdb_generate_header(cdb, (char*)"test", max, type, (char*)unit, 0, 0, 0);
+    cdb_generate_header(cdb, (char*)"test", (char*)"this is a long description", max, type, (char*)unit, 0, 0, 0);
     cdb_write_header(cdb);
 
     return cdb;

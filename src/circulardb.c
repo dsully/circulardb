@@ -1,11 +1,11 @@
 /*
  * CircularDB implementation for time series data.
  *
+ * Copyright (c) 2007-2009 Powerset, Inc
+ * Copyright (c) Dan Grillo, Manish Dubey, Dan Sully
+ *
+ * All rights reserved.
  */
-
-#ifndef LINT
-static const char svnid[] __attribute__ ((unused)) = "$Id: circulardb.c 56215 2009-01-27 20:55:37Z dan $";
-#endif
 
 #include "config.h"
 
@@ -271,11 +271,14 @@ int cdb_read_header(cdb_t *cdb) {
             return cdb_error();
         }
 
-        if (strncmp(cdb->header->token, CDB_TOKEN, 4) != 0) {
-            return cdb_error();
+        if (strncmp(cdb->header->token, CDB_TOKEN, sizeof(CDB_TOKEN)) != 0) {
+            return CDB_EBADTOK;
         }
 
-        /* Do version check here? */
+        if (strncmp(cdb->header->version, CDB_VERSION, sizeof(CDB_VERSION)) != 0) {
+            return CDB_EBADVER;
+        }
+
         cdb->synced = true;
 
         /* Calculate the number of records */
@@ -331,6 +334,7 @@ void cdb_print_header(cdb_t * cdb) {
 
     printf("version: [%s]\n", cdb->header->version);
     printf("name: [%s]\n", cdb->header->name);
+    printf("desc: [%s]\n", cdb->header->desc);
     printf("units: [%s]\n", cdb->header->units);
 
     if (cdb->header->type == CDB_TYPE_COUNTER) {
@@ -1242,7 +1246,7 @@ void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *requ
     free(records);
 }
 
-void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, int type, 
+void cdb_generate_header(cdb_t *cdb, char* name, char* desc, uint64_t max_records, int type,
     char* units, uint64_t min_value, uint64_t max_value, int interval) {
 
     if (max_records == 0) {
@@ -1261,15 +1265,21 @@ void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, int type,
         units = (char*)CDB_DEFAULT_DATA_UNIT;
     }
 
+    if (desc == NULL) {
+        desc = (char*)"";
+    }
+
     memset(cdb->header->name, 0, sizeof(cdb->header->name));
+    memset(cdb->header->desc, 0, sizeof(cdb->header->desc));
     memset(cdb->header->units, 0, sizeof(cdb->header->units));
     memset(cdb->header->version, 0, sizeof(cdb->header->version));
     memset(cdb->header->token, 0, sizeof(cdb->header->token));
 
-    strncpy(cdb->header->name, name, strlen(name));
-    strncpy(cdb->header->units, units, strlen(units));
-    strncpy(cdb->header->version, CDB_VERSION, strlen(CDB_VERSION));
-    strncpy(cdb->header->token, CDB_TOKEN, strlen(CDB_TOKEN));
+    strncpy(cdb->header->name, name, sizeof(cdb->header->name));
+    strncpy(cdb->header->desc, name, sizeof(cdb->header->desc));
+    strncpy(cdb->header->units, units, sizeof(cdb->header->units));
+    strncpy(cdb->header->version, CDB_VERSION, sizeof(cdb->header->version));
+    strncpy(cdb->header->token, CDB_TOKEN, sizeof(cdb->header->token));
 
     cdb->header->type         = type;
     cdb->header->interval     = interval;

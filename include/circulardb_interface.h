@@ -1,8 +1,10 @@
 /*
- * $Id$
- *
  * CircularDB implementation for time series data.
  *
+ * Copyright (c) 2007-2009 Powerset, Inc
+ * Copyright (c) Dan Grillo, Manish Dubey, Dan Sully
+ *
+ * All rights reserved.
  */
 
 #ifndef __CIRCULARDB_INTERFACE_H__
@@ -34,7 +36,7 @@ extern "C" {
  */
 
 #define CDB_TOKEN   "CDB"
-#define CDB_VERSION "1.1.0"
+#define CDB_VERSION "1.1.1"
 
 #define CDB_EXTENSION "cdb"
 #define CDB_DEFAULT_DATA_UNIT "absolute"
@@ -49,14 +51,15 @@ extern "C" {
 #define CDB_DEFAULT_DATA_TYPE CDB_TYPE_GAUGE
 
 typedef struct cdb_header_s {
-    char        token[4];           // CDB 
-    char        version[6];         // 
+    char        token[4];           // CDB
+    char        version[6];         //
     char        name[128];          // "short name" for this database
+    char        desc[512];          // a longer description of this database.
     char        units[64];          // bytes, percent, seconds, etc
     int         type;               // Defined above
     double      min_value;          // Values outside this range will be ignored/dropped
     double      max_value;          // Set both to 0 to disable.
-    uint64_t    max_records;        // Maximum records this CDB can hold before cycling. 
+    uint64_t    max_records;        // Maximum records this CDB can hold before cycling.
     int         interval;           // Interval that we expect to see data at.
     uint64_t    start_record;       // Pointer to the logical start record
     uint64_t    num_records;
@@ -125,6 +128,8 @@ enum {
     CDB_ENORECS  = 9,   /* No records were returned when they were expected */
     CDB_EINTERPD = 10,   /* Aggregate driver failure */ 
     CDB_EINTERPF = 11,  /* Aggregate follower failure */
+    CDB_EBADTOK  = 12,  /* The CDB had an invalid header token */
+    CDB_EBADVER  = 13,  /* The CDB had an incompatible version string */
 };
 
 #define RECORD_SIZE sizeof(cdb_record_t)
@@ -144,7 +149,7 @@ int cdb_read_header(cdb_t *cdb);
 /* Return CDB_SUCCESS, CDB_ERDONLY or errno */
 int cdb_write_header(cdb_t *cdb);
 
-void cdb_generate_header(cdb_t *cdb, char* name, uint64_t max_records, int type, 
+void cdb_generate_header(cdb_t *cdb, char* name, char* desc, uint64_t max_records, int type,
     char* units, uint64_t min_value, uint64_t max_value, int interval);
 
 /* Return CDB_SUCCESS, CDB_ERDONLY, CDB_EINVMAX or errno */
