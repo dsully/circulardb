@@ -1,0 +1,18 @@
+CircularDB is an on disk time series data storage format & library.
+
+Similar to RRDTool, but with cleaner, smaller code base & API.
+
+Optimized for writes, no averaging of data is done unless you ask for it.
+
+Some basic statistics are available, and ride on top of the GSL library:
+
+http://www.gnu.org/software/gsl/
+
+There is no graphing built in at this point.
+I recommend using Flot: http://code.google.com/p/flot/
+
+Documentation needs creating / improving.
+
+BSD License.
+
+--dan
