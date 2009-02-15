@@ -1,5 +1,3 @@
 CircularDB uses the standard GNU Autotools for configuration.
 
 You'll need GSL to compile the library, and libcheck for the tests.
-
-Run 'autoreconf --install' to generate a ./configure executable.
