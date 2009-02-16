@@ -49,7 +49,7 @@ class TestCircularDB < Test::Unit::TestCase
     type        = :gauge
     units       = "absolute"
     min_value   = 0
-    max_value   = 99
+    max_value   = 0
     interval    = 300
 
     (1..10).each { |i|

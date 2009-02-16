@@ -187,11 +187,11 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
 
         cdb_generate_header(cdb,
             StringValuePtr(name),
-            rb_num2ull(max_records),
+            NUM2ULL(max_records),
             _cdb_type_from_symbol(type),
             StringValuePtr(units),
-            rb_num2ull(min_value),
-            rb_num2ull(max_value),
+            NUM2ULL(min_value),
+            NUM2ULL(max_value),
             NUM2INT(interval)
         );
 
@@ -233,19 +233,19 @@ static VALUE _set_header(VALUE self, VALUE name, VALUE value) {
     } else if (strcmp(StringValuePtr(name), "min_value") == 0) {
 
         rb_hash_aset(header, ID2SYM(rb_intern("min_value")), value);
-        cdb->header->min_value = rb_num2ull(value);
+        cdb->header->min_value = NUM2ULL(value);
         cdb->synced = false;
 
     } else if (strcmp(StringValuePtr(name), "max_value") == 0) {
 
         rb_hash_aset(header, ID2SYM(rb_intern("max_value")), value);
-        cdb->header->max_value = rb_num2ull(value);
+        cdb->header->max_value = NUM2ULL(value);
         cdb->synced = false;
 
     } else if (strcmp(StringValuePtr(name), "interval") == 0) {
 
         rb_hash_aset(header, ID2SYM(rb_intern("interval")), value);
-        cdb->header->interval = rb_num2ull(value);
+        cdb->header->interval = NUM2ULL(value);
         cdb->synced = false;
 
     } else if (strcmp(StringValuePtr(name), "units") == 0) {
@@ -263,13 +263,13 @@ cdb_request_t _parse_cdb_request(VALUE start, VALUE end, VALUE count, VALUE cook
     cdb_request_t request = cdb_new_request();
 
     /* cooked defaults to true from cdb_new_request() */
-    if (NIL_P(cooked) || cooked == Qfalse) {
+    if (cooked == Qfalse) {
         request.cooked = false;
     }
 
     if (!NIL_P(start)) request.start = _parse_time(start);
     if (!NIL_P(end))   request.end   = _parse_time(end);
-    if (!NIL_P(count)) request.count = rb_num2ull(count);
+    if (!NIL_P(count)) request.count = NUM2ULL(count);
     if (!NIL_P(step))  request.step  = NUM2LONG(step);
 
     return request;
