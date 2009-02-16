@@ -301,48 +301,6 @@ static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
     return array;
 }
 
-/* get back the data in a way that's friendly to gnuplot.rb */
-static VALUE cdb_rb_read_records_cp(int argc, VALUE *argv, VALUE self) {
-
-    VALUE start, end, count, cooked, step, aggregate, array, x, y;
-
-    uint64_t i   = 0;
-    uint64_t cnt = 0;
-    uint64_t agg = 0;
-    int      ret = 0;
-
-    cdb_t *cdb;
-    cdb_range_t *range    = _new_statistics(self);
-    cdb_record_t *records = NULL;
-
-    rb_scan_args(argc, argv, "06", &start, &end, &count, &cooked, &step, &aggregate);
-
-    cdb_request_t request = _parse_cdb_request(start, end, count, cooked, step);
-
-    Data_Get_Struct(self, cdb_t, cdb);
-
-    agg = rb_num2ull(aggregate);
-    ret = cdb_read_records(cdb, &request, &cnt, &records, range);
-
-    _check_return(ret);
-
-    x = rb_ary_new2(cnt);
-    y = rb_ary_new2(cnt);
-
-    for (i = 0; i < cnt; i++) {
-        rb_ary_store(x, i, ULONG2NUM(records[i].time));
-        rb_ary_store(y, i, rb_float_new(records[i].value / agg));
-    }
-
-    array = rb_ary_new3(2, x, y);
-
-    free(records);
-
-    _cdb_rb_update_header_hash(self, cdb);
-
-    return array;
-}
-
 static VALUE _parse_time(VALUE time) {
 
     if (rb_obj_is_kind_of(time, mTime)) {
@@ -558,76 +516,6 @@ static VALUE cdb_rb_statistics(int argc, VALUE *argv, VALUE self) {
     return statistics;
 }
 
-/* Implement a a zip map write to stay out of Ruby thread context switching. */
-static int _process_each_record(VALUE uuid, VALUE values, VALUE args) {
-
-    if (uuid == Qnil) {
-        rb_raise(rb_eRuntimeError, "Empty or null UUID.");
-    }
-
-    VALUE basepath = rb_ary_entry(args, 0);
-    VALUE array    = rb_funcall(rb_ary_entry(args, 1), rb_intern("zip"), 1, values);
-
-    uint64_t len = RARRAY(array)->len;
-    uint64_t i   = 0;
-    uint64_t cnt = 0;
-    bool     ret = false;
-    int  pathlen = RSTRING(basepath)->len + RSTRING(uuid)->len + 2;
-    uint64_t *t  = (uint64_t*)rb_ary_entry(args, 2);
-
-    cdb_t *cdb = cdb_new();
-    cdb->flags = O_RDWR|O_CREAT|O_BINARY;
-    cdb->mode  = -1;
-
-    cdb_record_t *records = ALLOCA_N(cdb_record_t, len);
-    cdb->filename         = ALLOCA_N(char, pathlen);
-
-    snprintf(cdb->filename, pathlen, "%s/%s", StringValuePtr(basepath), StringValuePtr(uuid));
-
-    /* Try the open */
-    if (cdb_open(cdb) != CDB_SUCCESS) {
-        cdb_free(cdb);
-        rb_sys_fail(0);
-    }
-
-    /* Turn any nil's into NaN */
-    for (i = 0; i < len; i++) {
-        VALUE record = rb_ary_entry(array, i);
-        VALUE value  = rb_ary_entry(record, 1);
-
-        records[i].time  = NUM2ULONG(rb_ary_entry(record, 0));
-        records[i].value = value == Qnil ? CDB_NAN : NUM2DBL(value);
-    }
-
-    ret = cdb_write_records(cdb, records, len, &cnt);
-
-    if (ret != CDB_SUCCESS || cdb_close(cdb) != CDB_SUCCESS) {
-        cdb_free(cdb);
-        rb_sys_fail(0);
-    }
-
-    cdb_free(cdb);
-
-    *t += cnt;
-
-    return Qtrue;
-}
-
-static VALUE cdb_rb_write_zip_map(VALUE self, VALUE basepath, VALUE timestamps, VALUE records_map) {
-
-    uint64_t written = 0;
-
-    VALUE args = rb_ary_new2(3);
-
-    rb_ary_store(args, 0, basepath);
-    rb_ary_store(args, 1, timestamps);
-    rb_ary_store(args, 2, (VALUE)&written);
-
-    rb_hash_foreach(records_map, _process_each_record, args);
-
-    return INT2FIX(written);
-}
-
 /****************************************************************************************
  * Aggregate functions
  ****************************************************************************************/
@@ -811,7 +699,6 @@ void Init_circulardb_ext() {
     rb_define_method(cStorage, "close", cdb_rb_close_cdb, 0); 
     rb_define_method(cStorage, "read_header", cdb_rb_read_header, 0); 
     rb_define_method(cStorage, "read_records", cdb_rb_read_records, -1); 
-    rb_define_method(cStorage, "read_records_gp", cdb_rb_read_records_cp, -1); 
     rb_define_method(cStorage, "write_header", cdb_rb_write_header, 0); 
     rb_define_method(cStorage, "write_record", cdb_rb_write_record, 2); 
     rb_define_method(cStorage, "write_records", cdb_rb_write_records, 1); 
@@ -823,9 +710,6 @@ void Init_circulardb_ext() {
     rb_define_method(cStorage, "print_records", cdb_rb_print_records, -1); 
     rb_define_method(cStorage, "_set_header", _set_header, 2); 
     rb_define_method(cStorage, "statistics", cdb_rb_statistics, -1); 
-
-    /* Class method for fast writing */
-    rb_define_module_function(cStorage, "write_zip_map", cdb_rb_write_zip_map, 3);
 
     /* CircularDB::Aggregate class */
     rb_define_method(cAggregate, "initialize", cdb_agg_rb_initialize, 1); 
