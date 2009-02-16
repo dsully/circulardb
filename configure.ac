@@ -22,33 +22,6 @@ AM_PROG_LIBTOOL
 AC_PROG_MAKE_SET
 
 dnl
-dnl - check for Darwin and MacOS X
-dnl
-
-AC_MSG_CHECKING([for Darwin (Mac OS X)])
-if test "`(uname) 2>/dev/null`" = Darwin; then
-
-  AC_CACHE_CHECK([for CoreFoundation.framework], ax_cv_lib_corefoundation, [
-    hold_libs=$LIBS; 
-    LIBS="$LIBS -framework CoreFoundation"
-    AC_TRY_LINK([#include <CoreFoundation/CoreFoundation.h>],
-                [CFBundleRef b = CFBundleGetMainBundle();],
-                ax_cv_lib_corefoundation=yes, ax_cv_lib_corefoundation=no)
-    LIBS=$hold_libs;])
-  if test $ax_cv_lib_corefoundation = yes; then
-    LIBS="$LIBS -framework CoreFoundation"
-    AC_DEFINE(HAVE_COREFOUNDATION, 1,
-              [Do we have access to Darwin CoreFoundation.framework?])
-  else
-    ax_no_corefoundation=1
-  fi
-
-  CPPFLAGS="$CPPFLAGS -no-cpp-precomp"
-else
-  AC_MSG_RESULT(no)
-fi
-
-dnl
 dnl - disable optimizations and make things easier on gdb
 dnl
 
