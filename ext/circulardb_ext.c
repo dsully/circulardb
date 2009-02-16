@@ -34,6 +34,15 @@ void print_class(char* token, VALUE obj) {
     fprintf(stderr, "token: [%s] id: [%s]\n", token, StringValuePtr(class));
 }
 
+static VALUE _parse_time(VALUE time) {
+
+    if (rb_obj_is_kind_of(time, mTime)) {
+        time = rb_funcall(time, s_to_i, 0);
+    }
+
+    return NUM2ULONG(time);
+}
+
 void _check_return(int ret) {
 
     switch (ret) {
@@ -258,8 +267,8 @@ cdb_request_t _parse_cdb_request(VALUE start, VALUE end, VALUE count, VALUE cook
         request.cooked = false;
     }
 
-    if (!NIL_P(start)) request.start = NUM2UINT(start);
-    if (!NIL_P(end))   request.end   = NUM2UINT(end);
+    if (!NIL_P(start)) request.start = _parse_time(start);
+    if (!NIL_P(end))   request.end   = _parse_time(end);
     if (!NIL_P(count)) request.count = rb_num2ull(count);
     if (!NIL_P(step))  request.step  = NUM2LONG(step);
 
@@ -299,15 +308,6 @@ static VALUE cdb_rb_read_records(int argc, VALUE *argv, VALUE self) {
     _cdb_rb_update_header_hash(self, cdb);
 
     return array;
-}
-
-static VALUE _parse_time(VALUE time) {
-
-    if (rb_obj_is_kind_of(time, mTime)) {
-        time = rb_funcall(time, s_to_i, 0);
-    }
-
-    return NUM2ULONG(time);
 }
 
 /* Helper functions for write_* and update_* since they do almost the same * thing. */
