@@ -1,12 +1,12 @@
 # -*- ruby -*-
 
 require 'rubygems'
-require 'power_hoe'
+require 'hoe'
 
-PowerHoe.new('circulardb') do |p|
+Hoe.new('circulardb', '1.0.0') do |p|
   p.summary = "CircularDB Ruby Bindings"
   p.author  = "Dan Sully"
-  p.email   = "dan@powerset.com"
+  p.email   = "daniel-github@electricrain.com"
   p.spec_extras = {:extensions => ['ext/extconf.rb']}
 end
 
