@@ -1,6 +1,6 @@
 # change 'tests => 1' to 'tests => last_test_to_print';
 
-use Test::More tests => 52;
+use Test::More tests => 54;
 use File::Temp qw(tempfile);
 
 use CircularDB;
@@ -55,7 +55,7 @@ sub test_rw {
     my $type        = "gauge";
     my $units       = "absolute";
     my $min_value   = 0;
-    my $max_value   = 99;
+    my $max_value   = 0;
     my $interval    = 300;
 
     for (my $i = 1; $i < 11; $i++) {
@@ -88,18 +88,16 @@ sub test_rw {
     # Check setting a float and reading it back
     ok(1 == $cdb->update_record($records->[5][0], 999.0005));
 
-    $cdb->print_records(0, 0, 0, *STDERR);
-
     my $float_check = $cdb->read_records;
 
     ok($float_check->[5][1] == 999.0005);
 
     # Check setting value to undef
-    #ok(1 == $cdb->update_record($records->[6][0], undef));
+    ok(1 == $cdb->update_record($records->[6][0], undef));
 
-    #my $undef_check = $cdb->read_records;
+    my $undef_check = $cdb->read_records;
 
-    #ok(!defined $undef_check->[6][1]);
+    ok(!defined $undef_check->[6][1]);
 
     $cdb->close;
 

@@ -453,7 +453,7 @@ print_records(obj, ...)
   time_t start = 0;
   time_t end   = 0;
   int cnt = 0;
-  char* date_format = "%Y-%m-%d %H:%M:%S";
+  char *date_format = "%Y-%m-%d %H:%M:%S";
   bool cooked  = true;
   int step     = 0;
   PerlIO *fh   = PerlIO_stderr();
