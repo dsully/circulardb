@@ -1,14 +1,13 @@
 # change 'tests => 1' to 'tests => last_test_to_print';
 
-use Test::More tests => 54;
+use Test::More tests => 59;
 use File::Temp qw(tempfile);
 
 use CircularDB;
-#use Data::Dump qw(dump);
 use Fcntl qw(:DEFAULT);
 
 my ($file, $name);
-my $flags = 'rw';
+my $flags = O_RDWR|O_CREAT|O_EXCL;
 
 sub setup {
     my $fh;
@@ -49,7 +48,6 @@ sub test_rw {
     my $records = [];
     my $now     = scalar(time());
 
-    my $flags       = 0; #File::CREAT|File::RDWR|File::EXCL;
     my $mode        = undef;
     my $max_records = undef;
     my $type        = "gauge";
@@ -79,11 +77,11 @@ sub test_rw {
       ok($records->[$i][1] == $read->[$i][1]);
     }
 
-    #ok(5.5 == $cdb->statistics->mean);
-    #ok(5.5 == $cdb->statistics->median);
-    #ok(55 == $cdb->statistics->sum);
-    #ok(10 == $cdb->statistics->max);
-    #ok(1 == $cdb->statistics->min);
+    ok(5.5 == $cdb->statistics->mean);
+    ok(5.5 == $cdb->statistics->median);
+    ok(55 == $cdb->statistics->sum);
+    ok(10 == $cdb->statistics->max);
+    ok(1 == $cdb->statistics->min);
 
     # Check setting a float and reading it back
     ok(1 == $cdb->update_record($records->[5][0], 999.0005));
