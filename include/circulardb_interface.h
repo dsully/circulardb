@@ -65,8 +65,12 @@ typedef struct cdb_header_s {
     uint64_t    num_records;
 } cdb_header_t;
 
+/* Use a 64bit value for the time, to be compatible across platforms and not
+ * rely on the definition of time_t */
+typedef int64_t cdb_time_t;
+
 typedef struct cdb_record_s {
-    time_t time;
+    cdb_time_t time;
     double value;
 } cdb_record_t;
 
@@ -81,8 +85,8 @@ typedef struct cdb_s {
 
 /* roll up all the previous positional arguments */
 typedef struct cdb_request_s {
-    time_t start;
-    time_t end;
+    cdb_time_t start;
+    cdb_time_t end;
     int64_t count; /* number of records requested */
     bool cooked;   /* For counter types, do the math */
     long step;     /* Request averaged data */
@@ -91,8 +95,8 @@ typedef struct cdb_request_s {
 /* Hold all the stats for a particular time range, so this computation can be
  * done only once. */
 typedef struct cdb_range_s {
-    time_t start_time;
-    time_t end_time;
+    cdb_time_t start_time;
+    cdb_time_t end_time;
     uint64_t num_recs;
     double median, mean, sum, min, max, mad, stddev, absdev, variance, skew, kurtosis;
     double pct95th, pct75th, pct50th, pct25th;
@@ -154,12 +158,12 @@ void cdb_generate_header(cdb_t *cdb, char* name, char* desc, uint64_t max_record
 
 /* Return CDB_SUCCESS, CDB_ERDONLY, CDB_EINVMAX or errno */
 int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t *num_recs);
-bool cdb_write_record(cdb_t *cdb, time_t time, double value);
+bool cdb_write_record(cdb_t *cdb, cdb_time_t time, double value);
 
 /* Update particular record(s) in the DB after they have already been written. */
 /* Return CDB_SUCCESS, CDB_ERDONLY or errno */
 int cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t *num_recs);
-bool cdb_update_record(cdb_t *cdb, time_t time, double value);
+bool cdb_update_record(cdb_t *cdb, cdb_time_t time, double value);
 
 /* Return CDB_SUCCESS, CDB_ERDONLY or errno */
 int cdb_discard_records_in_time_range(cdb_t *cdb, cdb_request_t *request, uint64_t *num_recs);

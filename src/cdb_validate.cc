@@ -9,6 +9,16 @@
 
 using namespace std;
 
+char formatted[256];
+
+char* format_time(time_t time) {
+  const char *date_format = "%Y-%m-%d %H:%M:%S";
+
+  strftime(formatted, sizeof(formatted), date_format, localtime(&time));
+
+  return (char*)&formatted;
+}
+
 void validate(cdb_t *cdb) {
   cout << "Working on: " << cdb->filename << endl;
 
@@ -23,12 +33,12 @@ void validate(cdb_t *cdb) {
     return;
   }
 
-  std::set<time_t> all_dates;
-  std::map<time_t, std::string> wraps;
-  std::vector<time_t> duplicates;
-  std::vector<time_t> bad_dates;
+  std::set<cdb_time_t> all_dates;
+  std::map<cdb_time_t, std::string> wraps;
+  std::vector<cdb_time_t> duplicates;
+  std::vector<cdb_time_t> bad_dates;
 
-  time_t prev_date  = -1;
+  cdb_time_t prev_date  = -1;
   double prev_value = -1;
   uint64_t num_recs = 0;
   uint64_t i = 0;
@@ -40,13 +50,10 @@ void validate(cdb_t *cdb) {
   /* We want to check against raw data for counters */ 
   request.cooked = false;
 
-  char formatted[256];
-  const char *date_format = "%Y-%m-%d %H:%M:%S";
-
   cdb_read_records(cdb, &request, &num_recs, &records, range);
 
   for (i = 0; i < num_recs; i++) {
-    time_t date  = records[i].time;
+    cdb_time_t date  = records[i].time;
     double value = records[i].value;
 
     if (all_dates.find(date) != all_dates.end()) {
@@ -75,10 +82,7 @@ void validate(cdb_t *cdb) {
     cout << "Error: DB has " << bad_dates.size() << " record(s) with out of order timestamps." << endl;
 
     for (unsigned int i = 0; i < bad_dates.size(); i++) {
-
-      strftime(formatted, sizeof(formatted), date_format, localtime(&bad_dates[i]));
-
-      cout << "  [" << bad_dates[i] << "] " << formatted << endl;
+      cout << "  [" << bad_dates[i] << "] " << format_time((time_t)bad_dates[i]) << endl;
     }
   }
 
@@ -86,21 +90,15 @@ void validate(cdb_t *cdb) {
     cout << "Error: DB has " << duplicates.size() << " record(s) with duplicate timestamps." << endl;
 
     for (unsigned int i = 0; i < duplicates.size(); i++) {
-
-      strftime(formatted, sizeof(formatted), date_format, localtime(&duplicates[i]));
-
-      cout << "  [" << duplicates[i] << "] " << formatted << endl;
+      cout << "  [" << duplicates[i] << "] " << format_time((time_t)duplicates[i]) << endl;
     }
   }
 
   if (!wraps.empty()) {
     cout << "Error: DB has " << wraps.size() << " record(s) with counter wraps." << endl;
 
-    for (std::map<time_t, std::string>::const_iterator it = wraps.begin(); it != wraps.end(); ++it) {
-
-      strftime(formatted, sizeof(formatted), date_format, localtime(&it->first));
-
-      cout << "  [" << it->first << "] " << formatted << " :" << it->second << endl;
+    for (std::map<cdb_time_t, std::string>::const_iterator it = wraps.begin(); it != wraps.end(); ++it) {
+      cout << "  [" << it->first << "] " << format_time((time_t)it->first) << " :" << it->second << endl;
     }
   }
 

@@ -115,7 +115,7 @@ const char* _string_from_cdb_type(int type) {
   }
 }
 
-cdb_request_t _parse_cdb_request(time_t start, time_t end, uint64_t count, bool cooked, int step) {
+cdb_request_t _parse_cdb_request(cdb_time_t start, cdb_time_t end, uint64_t count, bool cooked, int step) {
   cdb_request_t request = cdb_new_request();
 
   request.start  = start;
@@ -156,7 +156,7 @@ int _cdb_write_or_update_records(SV* self, SV* array_ref, int type) {
     SV *time_sv  = *av_fetch(record, 0, 0);
     SV *value_sv = *av_fetch(record, 1, 0);
 
-    if (!SvIOK(time_sv) || (time_t)SvIV(time_sv) == 0) {
+    if (!SvIOK(time_sv) || (cdb_time_t)SvIV(time_sv) == 0) {
       continue;
     }
 
@@ -164,7 +164,7 @@ int _cdb_write_or_update_records(SV* self, SV* array_ref, int type) {
       value_sv = newSVnv(CDB_NAN);
     }
 
-    records[i].time  = (time_t)SvIV(time_sv);
+    records[i].time  = (cdb_time_t)SvIV(time_sv);
     records[i].value = (double)SvNV(value_sv);
   }
 
@@ -187,12 +187,12 @@ int _cdb_write_or_update_records(SV* self, SV* array_ref, int type) {
 int _cdb_write_or_update_record(SV* self, SV *time_sv, SV *value_sv, int type) {
 
   bool ret = false;
-  time_t time;
+  cdb_time_t time;
   double value;
 
   cdb_t *cdb = extract_cdb_ptr(self);
 
-  if (!SvIOK(time_sv) || (time_t)SvIV(time_sv) == 0) {
+  if (!SvIOK(time_sv) || (cdb_time_t)SvIV(time_sv) == 0) {
     return (int)ret;
   }
 
@@ -200,7 +200,7 @@ int _cdb_write_or_update_record(SV* self, SV *time_sv, SV *value_sv, int type) {
     value_sv = newSVnv(CDB_NAN);
   }
 
-  time  = (time_t)SvIV(time_sv);
+  time  = (cdb_time_t)SvIV(time_sv);
   value = (double)SvNV(value_sv);
 
   if (type == _CDB_WRITE) {
@@ -386,8 +386,8 @@ read_records(self, ...)
   SV *self;
 
   PREINIT:
-  time_t start = 0;
-  time_t end   = 0;
+  cdb_time_t start = 0;
+  cdb_time_t end   = 0;
   bool cooked  = true;
   uint64_t cnt = 0;
   int step     = 0;
@@ -458,8 +458,8 @@ print_records(self, ...)
   SV *self;
 
   PREINIT:
-  time_t start = 0;
-  time_t end   = 0;
+  cdb_time_t start = 0;
+  cdb_time_t end   = 0;
   int cnt = 0;
   char *date_format = "%Y-%m-%d %H:%M:%S";
   bool cooked  = true;
@@ -565,7 +565,7 @@ discard_records_in_time_range(self, start, end)
 
   cdb_t *cdb = extract_cdb_ptr(self);
 
-  request = _parse_cdb_request(start, end, 0, false, 0);
+  request = _parse_cdb_request((cdb_time_t)start, (cdb_time_t)end, 0, false, 0);
   ret     = cdb_discard_records_in_time_range(cdb, &request, &cnt);
 
   _check_return(ret);
@@ -643,8 +643,8 @@ read_records(self, ...)
   SV *self;
 
   PREINIT:
-  time_t start = 0;
-  time_t end   = 0;
+  cdb_time_t start = 0;
+  cdb_time_t end   = 0;
   bool cooked  = true;
   uint64_t cnt = 0;
   int step     = 0;
@@ -724,8 +724,8 @@ print_records(self, ...)
   SV *self;
 
   PREINIT:
-  time_t start = 0;
-  time_t end   = 0;
+  cdb_time_t start = 0;
+  cdb_time_t end   = 0;
   int cnt = 0;
   char *date_format = "%Y-%m-%d %H:%M:%S";
   bool cooked  = true;

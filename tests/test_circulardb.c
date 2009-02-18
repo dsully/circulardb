@@ -14,7 +14,7 @@ static const char svnid[] __attribute__ ((unused)) = "$Id$";
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include "../include/circulardb_interface.h"
+#include <circulardb.h>
 
 #define TEST_FILENAME "/tmp/cdb_test.cdb"
 
@@ -307,7 +307,7 @@ START_TEST (test_cdb_timefind)
     uint64_t num_recs = 0;
 
     int i = 0;
-    time_t start_time = 1222794797;
+    cdb_time_t start_time = 1222794797;
 
     cdb_t *cdb = create_cdb(CDB_TYPE_GAUGE, "percent", 25000);
 

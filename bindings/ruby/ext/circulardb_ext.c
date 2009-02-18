@@ -187,6 +187,7 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
 
         cdb_generate_header(cdb,
             StringValuePtr(name),
+            "", // Desc
             NUM2ULL(max_records),
             _cdb_type_from_symbol(type),
             StringValuePtr(units),

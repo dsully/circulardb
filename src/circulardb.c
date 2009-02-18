@@ -46,7 +46,7 @@ int cdb_error(void) {
     return cdb_error;
 }
 
-static void _print_record(FILE *fh, time_t time, double value, const char *date_format) {
+static void _print_record(FILE *fh, cdb_time_t time, double value, const char *date_format) {
 
     if (date_format == NULL || strcmp(date_format, "") == 0) {
 
@@ -55,8 +55,9 @@ static void _print_record(FILE *fh, time_t time, double value, const char *date_
     } else {
 
         char formatted[256];
+        time_t stime = (time_t)time;
         
-        strftime(formatted, sizeof(formatted), date_format, localtime(&time));
+        strftime(formatted, sizeof(formatted), date_format, localtime(&stime));
 
         fprintf(fh, "%d [%s] %.8g\n", (int)(time), formatted, value);
     }
@@ -128,10 +129,10 @@ static int64_t _seek_to_logical_record(cdb_t *cdb, int64_t logical_record) {
     return physical_record;
 }
 
-static time_t _time_for_logical_record(cdb_t *cdb, int64_t logical_record) {
+static cdb_time_t _time_for_logical_record(cdb_t *cdb, int64_t logical_record) {
 
     cdb_record_t record[RECORD_SIZE];
-    time_t time = 0;
+    cdb_time_t time = 0;
 
     /* skip over any record that has NULL time or bad time values
        Such datapoints in cdb indicate a corrupted cdb. */
@@ -156,10 +157,10 @@ static time_t _time_for_logical_record(cdb_t *cdb, int64_t logical_record) {
 }
 
 /* note - if no exact match, will return a record with a time greater than the requested value */
-static int64_t _logical_record_for_time(cdb_t *cdb, time_t req_time, int64_t start_logical_record, int64_t end_logical_record) {
+static int64_t _logical_record_for_time(cdb_t *cdb, cdb_time_t req_time, int64_t start_logical_record, int64_t end_logical_record) {
 
     int first_time = 0;
-    time_t start_time, next_time, center_time;
+    cdb_time_t start_time, next_time, center_time;
     int64_t delta, center_logical_record, next_logical_record;
 
     uint64_t num_recs = cdb->header->num_records;
@@ -435,7 +436,7 @@ int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t 
     return CDB_SUCCESS;
 }
 
-bool cdb_write_record(cdb_t *cdb, time_t time, double value) {
+bool cdb_write_record(cdb_t *cdb, cdb_time_t time, double value) {
 
     cdb_record_t record[RECORD_SIZE];
     uint64_t num_recs = 0;
@@ -470,8 +471,8 @@ int cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t
 
     for (i = 0; i < len; i++) {
 
-        time_t time = records[i].time;
-        time_t rtime;
+        cdb_time_t time = records[i].time;
+        cdb_time_t rtime;
         uint64_t lrec;
 
         lrec = _logical_record_for_time(cdb, time, 0, 0);
@@ -528,7 +529,7 @@ int cdb_update_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t
     return ret;
 }
 
-bool cdb_update_record(cdb_t *cdb, time_t time, double value) {
+bool cdb_update_record(cdb_t *cdb, cdb_time_t time, double value) {
 
     cdb_record_t record[RECORD_SIZE];
     uint64_t num_recs = 0;
@@ -566,7 +567,7 @@ int cdb_discard_records_in_time_range(cdb_t *cdb, cdb_request_t *request, uint64
 
     for (i = lrec; i < cdb->header->num_records; i++) {
 
-        time_t rtime = _time_for_logical_record(cdb, i);
+        cdb_time_t rtime = _time_for_logical_record(cdb, i);
 
         if (rtime >= request->start && rtime <= request->end) {
 
@@ -863,7 +864,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
         uint64_t i = 0;
         uint64_t cooked_recs = 0;
         double prev_value = 0.0;
-        time_t prev_date  = 0;
+        cdb_time_t prev_date = 0;
         cdb_record_t *crecords;
 
         if ((crecords = calloc(*num_recs, RECORD_SIZE)) == NULL) {
@@ -884,8 +885,8 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
 
         for (i = 0; i < *num_recs; i++) {
 
-            time_t date  = buffer[i].time;
-            double value = buffer[i].value;
+            cdb_time_t date = buffer[i].time;
+            double value    = buffer[i].value;
 
             if (cdb->header->type == CDB_TYPE_COUNTER) {
                 double new_value = value;
@@ -912,7 +913,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
                     continue;
                 }
 
-                time_t time_delta = date - prev_date;
+                cdb_time_t time_delta = date - prev_date;
 
                 if (time_delta > 0 && !isnan(value)) {
                     value = factor * (value / time_delta);
@@ -980,7 +981,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
                 yi[j] = buffer[i+j].value;
             }
 
-            arecords[step_recs].time  = (time_t)gsl_stats_mean(xi, 1, step);
+            arecords[step_recs].time  = (cdb_time_t)gsl_stats_mean(xi, 1, step);
             arecords[step_recs].value = gsl_stats_mean(yi, 1, step);
             step_recs += 1;
         }
@@ -1006,7 +1007,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
                 j++;
             }
 
-            arecords[step_recs].time  = (time_t)gsl_stats_mean(xi, 1, j);
+            arecords[step_recs].time  = (cdb_time_t)gsl_stats_mean(xi, 1, j);
             arecords[step_recs].value = gsl_stats_mean(yi, 1, j);
             step_recs += 1;
         }
