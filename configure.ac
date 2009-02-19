@@ -16,9 +16,14 @@ AM_INIT_AUTOMAKE
 AM_MAINTAINER_MODE
 
 AC_PROG_CC
-AM_CONFIG_HEADER(config.h)
+AC_PROG_CPP
+AC_PROG_CXX
+AC_PROG_LIBTOOL
+AC_PROG_INSTALL
+AC_PROG_LN_S
+AC_PROG_MKDIR_P
 
-AM_PROG_LIBTOOL
+AM_CONFIG_HEADER(config.h)
 AC_PROG_MAKE_SET
 
 dnl
@@ -65,39 +70,84 @@ fi
 
 AC_SUBST(ENABLE_HARDCORE)
 
+AC_MSG_CHECKING([for Darwin (Mac OS X)])
+if test "`(uname) 2>/dev/null`" = Darwin; then
+
+  ENVARGS="ARCHFLAGS=\"-arch `/usr/bin/arch`\""
+else
+  AC_MSG_RESULT(no)
+fi
+AC_SUBST(ENVARGS)
+
+AC_DEFUN([AX_CDB_BINDING], [
+    AC_ARG_WITH($1,
+        AC_HELP_STRING([--with-$1], [build the $2 library @<:@default=$3@:>@]),
+            [with_$1="$withval"],
+            [with_$1=$3]
+        )
+    ])
+
+# Build bindings for different languages.
+AX_CDB_BINDING(py, [Python], yes)
+if test "$with_py" = "yes";  then
+  AM_PATH_PYTHON(2.4,, :)
+fi
+AM_CONDITIONAL(WITH_PYTHON, [test -n "$PYTHON" -a "$PYTHON" != ":"])
+
+AX_CDB_BINDING(perl, [Perl], yes)
+if test "$with_perl" = "yes"; then
+  AC_PATH_PROG([PERL], [perl])
+fi
+AM_CONDITIONAL(WITH_PERL, [test -n "$PERL"])
+
+AX_CDB_BINDING(ruby, [Ruby], yes)
+if test "$with_ruby" = "yes"; then
+  AC_PATH_PROG([RUBY], [ruby])
+fi
+AM_CONDITIONAL(WITH_RUBY, [test -n "$RUBY"])
+
 # Checks for header files.
 AC_HEADER_STDC
+AC_HEADER_STDBOOL
+AC_HEADER_TIME
 AC_CHECK_HEADERS([fcntl.h string.h values.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 # autoconf 2.59 doesn't define these. 2.60 does.
+
 AC_TYPE_OFF_T
 AC_TYPE_INT64_T
 AC_TYPE_UINT64_T
+AC_TYPE_OFF_T
+AC_TYPE_SIZE_T
 
 AC_CHECK_SIZEOF(double)
-AC_CHECK_SIZEOF(long double)
 
-if test $ac_cv_sizeof_long_double = 0; then
-    AC_MSG_ERROR([long double is not a supported type with your compiler.])
-fi
-if test $ac_cv_sizeof_long_double = $ac_cv_sizeof_double; then
-    AC_MSG_ERROR([long double is the same size as double. Precision may be lost.])
+if test $ac_cv_sizeof_double = 0; then
+    AC_MSG_ERROR([double is not a supported type with your compiler.])
 fi
 
 # Checks for library functions.
 AC_FUNC_MALLOC
+AC_FUNC_ALLOCA
+AC_FUNC_STAT
 AC_FUNC_MMAP
 AC_FUNC_STRFTIME
-AC_CHECK_FUNCS([strerror fdatasync fsync])
+AC_CHECK_FUNCS([strerror pread pwrite])
+
+AC_DEFINE(_GNU_SOURCE, 1, [GNU headers])
 
 # Check for GSL
 AM_PATH_GSL
 
-AC_DEFINE(_GNU_SOURCE, 1, [GNU headers])
-
 AC_CONFIG_FILES([
     Makefile
+    bindings/Makefile
+    bindings/perl/Makefile
+    bindings/perl/Makefile.PL
+    bindings/python/Makefile
+    bindings/ruby/Makefile
+    bindings/ruby/ext/extconf.rb
     src/Makefile
     tests/Makefile
     include/Makefile

@@ -8,9 +8,11 @@ WriteMakefile(
     #($] >= 5.005 ?     ## Add these new keywords supported since 5.005
     #  (ABSTRACT_FROM  => 'lib/CircularDB.pm', # retrieve abstract from module
     #   AUTHOR         => 'Dan Sully <daniel-github@electricrain.com>') : ()),
-    LIBS              => ['-lgsl -lgslcblas -lcirculardb'], # e.g., '-lm'
-    DEFINE            => '-Wall -Werror -Wpointer-arith',
+    LIBS              => ['@GSL_LIBS@ -L@top_srcdir@/src/.libs -lcirculardb'],
+    DEFINE            => '@DEFS@',
     INC               => '-I. -I../../include',
-	# Un-comment this if you add C files to link with later:
+    CCFLAGS           => "$Config{'ccflags'} @CFLAGS@ -Wall -Wpointer-arith",
+    LDFLAGS           => "$Config{'ldflags'}",
+    # Un-comment this if you add C files to link with later:
     # OBJECT            => '$(O_FILES)', # link all the C files too
 );

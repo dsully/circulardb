@@ -1,0 +1,28 @@
+#!/usr/bin/env ruby
+
+ENV['RC_ARCHS'] = %x(arch)
+
+require 'rbconfig'
+
+# This is required for the have_library() check below.
+#Config::CONFIG['CC'] = '@top_srcdir@/libtool --tag=CC --mode=link cc'
+
+# And this for the actual compile/link.
+#Config::MAKEFILE_CONFIG['LDSHARED'] = "@top_srcdir@/libtool --tag=CC --mode=link #{Config::CONFIG["LDSHARED"]}"
+
+require 'mkmf'
+require 'fileutils'
+
+$CFLAGS  << " -I@top_srcdir@/include @CFLAGS@ -Wall -Wpointer-arith"
+$LDFLAGS << " -L@top_srcdir@/src/.libs @GSL_LIBS@"
+
+exit unless have_header("circulardb.h")
+exit unless have_library("circulardb", "cdb_new", "circulardb.h")
+
+name = "circulardb_ext"
+
+link_command("-lcirculardb")
+dir_config(name)
+create_makefile(name)
+
+FileUtils.rm_rf("@top_srcdir@/bindings/ruby/ext/conftest.dSYM")

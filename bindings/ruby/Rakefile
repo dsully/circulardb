@@ -3,6 +3,12 @@
 require 'rubygems'
 require 'hoe'
 
+task :build do
+  sh "cd ext && ruby extconf.rb && make"
+end
+
+task :test => :build
+
 Hoe.new('circulardb', '1.0.0') do |p|
   p.summary = "CircularDB Ruby Bindings"
   p.author  = "Dan Sully"

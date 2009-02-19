@@ -6,6 +6,7 @@ ppport.h
 README
 t/00use.t
 t/01basic.t
+t/02aggregation.t
 lib/CircularDB.pm
 lib/CircularDB/Aggregate.pm
 lib/CircularDB/Storage.pm

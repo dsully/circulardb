@@ -130,6 +130,7 @@ VALUE _symbol_from_cdb_type(int type) {
     switch (type) {
         case CDB_TYPE_GAUGE  : return ID2SYM(rb_intern("gauge"));
         case CDB_TYPE_COUNTER: return ID2SYM(rb_intern("counter"));
+        default: return ID2SYM(rb_intern("gauge"));
     }
 }
 
