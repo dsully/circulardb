@@ -1,4 +1,4 @@
-/* $Id: circulardb_ext.c 16 2007-09-04 21:06:11Z dsully $ 
+/* $Id: circulardb_ext.c 16 2007-09-04 21:06:11Z dsully $
  *
  * Ruby bindings for CircularDB
  *
@@ -62,14 +62,14 @@ static void cdb_rb_free(void *p) {
     cdb_free(p);
 }
 
-static VALUE cdb_rb_alloc(VALUE klass) { 
+static VALUE cdb_rb_alloc(VALUE klass) {
 
     cdb_t *cdb = cdb_new();
 
     VALUE obj = Data_Wrap_Struct(klass, 0, cdb_rb_free, cdb);
 
     return obj;
-} 
+}
 
 /* Allocator/Dealloc for CircularDB::Statistics */
 static void cdb_statistics_rb_free(void *p) {
@@ -79,7 +79,7 @@ static void cdb_statistics_rb_free(void *p) {
     }
 }
 
-static VALUE cdb_statistics_rb_alloc(VALUE klass) { 
+static VALUE cdb_statistics_rb_alloc(VALUE klass) {
 
     cdb_range_t *range = calloc(1, sizeof(cdb_range_t));
 
@@ -112,7 +112,7 @@ void _cdb_rb_update_header_hash(VALUE self, cdb_t *cdb) {
 
     VALUE header = rb_iv_get(self, "@header");
 
-    /* Update the number of records in the ruby header hash */ 
+    /* Update the number of records in the ruby header hash */
     rb_hash_aset(header, ID2SYM(rb_intern("num_records")), ULL2NUM(cdb->header->num_records));
 }
 
@@ -685,7 +685,7 @@ static VALUE statistics_25th(VALUE self) {
 
 /*
  *  Document-class: mCircularDB
- *  This is CircularDB 
+ *  This is CircularDB
  */
 void Init_circulardb_ext() {
 
@@ -696,44 +696,44 @@ void Init_circulardb_ext() {
 
     /* CircularDB::Storage class */
     rb_define_alloc_func(cStorage, cdb_rb_alloc);
-    rb_define_method(cStorage, "initialize", cdb_rb_initialize, -1); 
-    rb_define_method(cStorage, "open", cdb_rb_open_cdb, 0); 
-    rb_define_method(cStorage, "close", cdb_rb_close_cdb, 0); 
-    rb_define_method(cStorage, "read_header", cdb_rb_read_header, 0); 
-    rb_define_method(cStorage, "read_records", cdb_rb_read_records, -1); 
-    rb_define_method(cStorage, "write_header", cdb_rb_write_header, 0); 
-    rb_define_method(cStorage, "write_record", cdb_rb_write_record, 2); 
-    rb_define_method(cStorage, "write_records", cdb_rb_write_records, 1); 
-    rb_define_method(cStorage, "update_record", cdb_rb_update_record, 2); 
-    rb_define_method(cStorage, "update_records", cdb_rb_update_records, 1); 
-    rb_define_method(cStorage, "discard_records_in_time_range", cdb_rb_discard_records_in_time_range, 2); 
-    rb_define_method(cStorage, "print", cdb_rb_print, 0); 
-    rb_define_method(cStorage, "print_header", cdb_rb_print_header, 0); 
-    rb_define_method(cStorage, "print_records", cdb_rb_print_records, -1); 
-    rb_define_method(cStorage, "_set_header", _set_header, 2); 
-    rb_define_method(cStorage, "statistics", cdb_rb_statistics, -1); 
+    rb_define_method(cStorage, "initialize", cdb_rb_initialize, -1);
+    rb_define_method(cStorage, "open", cdb_rb_open_cdb, 0);
+    rb_define_method(cStorage, "close", cdb_rb_close_cdb, 0);
+    rb_define_method(cStorage, "read_header", cdb_rb_read_header, 0);
+    rb_define_method(cStorage, "read_records", cdb_rb_read_records, -1);
+    rb_define_method(cStorage, "write_header", cdb_rb_write_header, 0);
+    rb_define_method(cStorage, "write_record", cdb_rb_write_record, 2);
+    rb_define_method(cStorage, "write_records", cdb_rb_write_records, 1);
+    rb_define_method(cStorage, "update_record", cdb_rb_update_record, 2);
+    rb_define_method(cStorage, "update_records", cdb_rb_update_records, 1);
+    rb_define_method(cStorage, "discard_records_in_time_range", cdb_rb_discard_records_in_time_range, 2);
+    rb_define_method(cStorage, "print", cdb_rb_print, 0);
+    rb_define_method(cStorage, "print_header", cdb_rb_print_header, 0);
+    rb_define_method(cStorage, "print_records", cdb_rb_print_records, -1);
+    rb_define_method(cStorage, "_set_header", _set_header, 2);
+    rb_define_method(cStorage, "statistics", cdb_rb_statistics, -1);
 
     /* CircularDB::Aggregate class */
-    rb_define_method(cAggregate, "initialize", cdb_agg_rb_initialize, 1); 
-    rb_define_method(cAggregate, "read_records", cdb_agg_rb_read_records, -1); 
-    rb_define_method(cAggregate, "print_records", cdb_agg_rb_print_records, -1); 
-    rb_define_method(cAggregate, "statistics", cdb_agg_rb_statistics, -1); 
+    rb_define_method(cAggregate, "initialize", cdb_agg_rb_initialize, 1);
+    rb_define_method(cAggregate, "read_records", cdb_agg_rb_read_records, -1);
+    rb_define_method(cAggregate, "print_records", cdb_agg_rb_print_records, -1);
+    rb_define_method(cAggregate, "statistics", cdb_agg_rb_statistics, -1);
 
     /* CircularDB::Statistics class */
     rb_define_alloc_func(cStatistics, cdb_statistics_rb_alloc);
-    rb_define_method(cStatistics, "median", statistics_median, 0); 
-    rb_define_method(cStatistics, "mad", statistics_mad, 0); 
-    rb_define_method(cStatistics, "average", statistics_average, 0); 
-    rb_define_method(cStatistics, "mean", statistics_mean, 0); 
-    rb_define_method(cStatistics, "sum", statistics_sum, 0); 
-    rb_define_method(cStatistics, "min", statistics_min, 0); 
-    rb_define_method(cStatistics, "max", statistics_max, 0); 
-    rb_define_method(cStatistics, "stddev", statistics_stddev, 0); 
-    rb_define_method(cStatistics, "absdev", statistics_absdev, 0); 
-    rb_define_method(cStatistics, "pct95th", statistics_95th, 0); 
-    rb_define_method(cStatistics, "pct75th", statistics_75th, 0); 
-    rb_define_method(cStatistics, "pct50th", statistics_50th, 0); 
-    rb_define_method(cStatistics, "pct25th", statistics_25th, 0); 
+    rb_define_method(cStatistics, "median", statistics_median, 0);
+    rb_define_method(cStatistics, "mad", statistics_mad, 0);
+    rb_define_method(cStatistics, "average", statistics_average, 0);
+    rb_define_method(cStatistics, "mean", statistics_mean, 0);
+    rb_define_method(cStatistics, "sum", statistics_sum, 0);
+    rb_define_method(cStatistics, "min", statistics_min, 0);
+    rb_define_method(cStatistics, "max", statistics_max, 0);
+    rb_define_method(cStatistics, "stddev", statistics_stddev, 0);
+    rb_define_method(cStatistics, "absdev", statistics_absdev, 0);
+    rb_define_method(cStatistics, "pct95th", statistics_95th, 0);
+    rb_define_method(cStatistics, "pct75th", statistics_75th, 0);
+    rb_define_method(cStatistics, "pct50th", statistics_50th, 0);
+    rb_define_method(cStatistics, "pct25th", statistics_25th, 0);
 
     /* To handle Time objects */
     mTime = rb_const_get(rb_cObject, rb_intern("Time"));

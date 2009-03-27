@@ -433,7 +433,7 @@ Suite* cdb_suite (void) {
 
     return s;
 }
-         
+
 int
 main (void) {
     int number_failed;

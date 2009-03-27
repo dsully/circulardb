@@ -53,7 +53,7 @@ void _check_return(int ret) {
 void _cdb_update_header_hash(SV *self, cdb_t *cdb) {
   HV *header = (HV *)SvRV(*(my_hv_fetch((HV *)SvRV(self), "header")));
 
-  /* Update the number of records in the header hash */ 
+  /* Update the number of records in the header hash */
   my_hv_store(header, "num_records", newSVnv(cdb->header->num_records));
 }
 

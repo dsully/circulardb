@@ -127,10 +127,10 @@ enum {
     CDB_EFAILED  = 4,   /* generic failure */
     CDB_ESANITY  = 5,   /* sanity check failed - shouldn't happen */
     CDB_ENOMEM   = 6,   /* malloc failed */
-    CDB_EINVMAX  = 7,   /* max_records is invalid */ 
+    CDB_EINVMAX  = 7,   /* max_records is invalid */
     CDB_ERDONLY  = 8,   /* Trying to write to a read-only database */
     CDB_ENORECS  = 9,   /* No records were returned when they were expected */
-    CDB_EINTERPD = 10,   /* Aggregate driver failure */ 
+    CDB_EINTERPD = 10,   /* Aggregate driver failure */
     CDB_EINTERPF = 11,  /* Aggregate follower failure */
     CDB_EBADTOK  = 12,  /* The CDB had an invalid header token */
     CDB_EBADVER  = 13,  /* The CDB had an incompatible version string */
