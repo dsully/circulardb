@@ -5,7 +5,7 @@ all-local:
 	$(RUBY) setup.rb setup
 
 install-exec-hook:
-	$(RUBY) setup.rb install
+	$(RUBY) setup.rb install --prefix=$(DESTDIR)$(prefix)
 
 # Make sure this doesn't fail if Ruby is not configured.
 clean-local:
