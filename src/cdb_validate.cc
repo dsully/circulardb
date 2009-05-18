@@ -118,7 +118,6 @@ int main(int argc, char** argv) {
       cdb_t *cdb = cdb_new();
       cdb->filename = argv[i];
       cdb->flags = O_RDONLY;
-      cdb_read_header(cdb);
 
       ret = cdb_read_header(cdb);
 

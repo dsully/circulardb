@@ -259,9 +259,10 @@ new(class, path, ...)
   if (items >= 3 && SvOK(ST(3)))
     mode = SvIV(ST(3));
 
-  if (items >= 4 && SvOK(ST(4)))
+  if (items >= 4 && SvOK(ST(4))) {
     name = SvPV_nolen(ST(4));
     has_name = true;
+  }
 
   if (items >= 5 && SvOK(ST(5)))
     max_records = SvNV(ST(5));
@@ -290,6 +291,7 @@ new(class, path, ...)
 
   if (ret != CDB_SUCCESS) {
     warn("Couldn't open CircularDB file: %s Error: [%s]\n", path, strerror(ret));
+    cdb_free(cdb);
     XSRETURN_UNDEF;
   }
 
@@ -300,6 +302,7 @@ new(class, path, ...)
 
     if (ret != CDB_SUCCESS) {
       warn("Couldn't read header! File: %s Error: [%s]\n", path, strerror(ret));
+      cdb_free(cdb);
       XSRETURN_UNDEF;
     }
 
@@ -311,6 +314,7 @@ new(class, path, ...)
 
     if (ret != CDB_SUCCESS) {
       warn("Couldn't write header! File: %s Error: [%s]\n", path, strerror(ret));
+      cdb_free(cdb);
       XSRETURN_UNDEF;
     }
   }
