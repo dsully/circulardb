@@ -103,9 +103,10 @@ int main (void)
 {
   int major = 0, minor = 0, micro = 0;
   int n;
+  int ret;
   char *tmp_version;
 
-  system ("touch conf.gsltest");
+  ret = system ("touch conf.gsltest");
 
   /* HP/UX 9 (%@#!) writes to sscanf strings */
   tmp_version = my_strdup("$min_gsl_version");
