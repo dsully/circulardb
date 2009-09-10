@@ -159,7 +159,7 @@ static cdb_time_t _time_for_logical_record(cdb_t *cdb, int64_t logical_record) {
 /* note - if no exact match, will return a record with a time greater than the requested value */
 static int64_t _logical_record_for_time(cdb_t *cdb, cdb_time_t req_time, int64_t start_logical_record, int64_t end_logical_record) {
 
-    int first_time = 0;
+    bool first_time = false;
     cdb_time_t start_time, next_time, center_time;
     int64_t delta, center_logical_record, next_logical_record;
 
@@ -171,8 +171,8 @@ static int64_t _logical_record_for_time(cdb_t *cdb, cdb_time_t req_time, int64_t
         start_logical_record = 0;
         end_logical_record   = num_recs - 1;
 
-        first_time = 1;
-    } 
+        first_time = true;
+    }
 
     /* if no particular time was requested, just return the first one. */
     if (req_time == 0) {
@@ -595,7 +595,7 @@ int cdb_discard_records_in_time_range(cdb_t *cdb, cdb_request_t *request, uint64
     return CDB_SUCCESS;
 }
 
-static int _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_records, long *factor) {
+static int _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_records, int32_t *factor) {
 
     if (cdb->header->type == CDB_TYPE_COUNTER) {
         if (*num_records != 0) {
@@ -610,7 +610,7 @@ static int _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_record
 
     if (strlen(cdb->header->units) > 0) {
 
-        int multiplier = 1;
+        int32_t multiplier = 1;
         char *frequency;
  
         if ((frequency = calloc(strlen(cdb->header->units), sizeof(char))) == NULL) {
@@ -860,7 +860,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
     if (request->cooked) {
 
         bool check_min_max = true;
-        long factor = 0;
+        int32_t factor = 0;
         uint64_t i = 0;
         uint64_t cooked_recs = 0;
         double prev_value = 0.0;
@@ -947,13 +947,13 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
     if (request->step > 1) {
 
         cdb_record_t *arecords;
-        long     step      = request->step;
+        uint32_t step      = request->step;
         uint64_t step_recs = 0;
         uint64_t leftover  = (*num_recs % step);
         uint64_t walkend   = (*num_recs - leftover);
         uint64_t i = 0;
 
-        if ((arecords = calloc((int)((*num_recs / step) + leftover), RECORD_SIZE)) == NULL) {
+        if ((arecords = calloc(((*num_recs / step) + leftover), RECORD_SIZE)) == NULL) {
             free(arecords);
             free(buffer);
             return CDB_ENOMEM;
@@ -965,7 +965,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
          */
         for (i = 0; i < walkend; i += step) {
 
-            int j = 0;
+            uint64_t j = 0;
             double xi[step];
             double yi[step];
 
@@ -990,7 +990,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
         if (leftover > 0) {
             uint64_t leftover_start = *num_recs - leftover;
 
-            int j = 0;
+            uint64_t j = 0;
             double xi[leftover];
             double yi[leftover];
 
@@ -1228,7 +1228,7 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *reques
     return ret;
 }
 
-void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *request, FILE *fh, const char *date_format) {
+void cdb_print_aggregate_records(cdb_t **cdbs, int32_t num_cdbs, cdb_request_t *request, FILE *fh, const char *date_format) {
 
     uint64_t i = 0;
     uint64_t num_recs = 0;
@@ -1247,8 +1247,8 @@ void cdb_print_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *requ
     free(records);
 }
 
-void cdb_generate_header(cdb_t *cdb, char* name, char* desc, uint64_t max_records, int type,
-    char* units, uint64_t min_value, uint64_t max_value, int interval) {
+void cdb_generate_header(cdb_t *cdb, char* name, char* desc, uint64_t max_records, int32_t type,
+    char* units, uint64_t min_value, uint64_t max_value, int32_t interval) {
 
     if (max_records == 0) {
         max_records = CDB_DEFAULT_RECORDS;
