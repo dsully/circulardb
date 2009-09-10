@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <fcntl.h>
+#include <malloc.h>
 #include "circulardb_interface.h"
 
 using namespace std;
