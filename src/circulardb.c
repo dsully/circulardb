@@ -14,7 +14,7 @@
 #include <fcntl.h>
 #include <float.h>
 #include <inttypes.h>
-#include <math.h>  
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -56,7 +56,7 @@ static void _print_record(FILE *fh, cdb_time_t time, double value, const char *d
 
         char formatted[256];
         time_t stime = (time_t)time;
-        
+
         strftime(formatted, sizeof(formatted), date_format, localtime(&stime));
 
         fprintf(fh, "%d [%s] %.8g\n", (int)(time), formatted, value);
@@ -70,17 +70,17 @@ static uint64_t _physical_record_for_logical_record(cdb_header_t *header, int64_
     /* -ve indicates nth record from the end
        +ve indicates nth record from the beginning (zero based counting for
           this case)
-     
+
        -3 = seek to 3rd record from the end
         5 = seek to 6th record from the beginning
         0 = seek to first record (start) from the beginning
 
        change the request for -nth record (nth record from the end)
        to a request for mth record from the beginning, where:
-     
+
        m = N + n (n is -ve)
-     
-       N : total num of records. */ 
+
+       N : total num of records. */
 
     if (logical_record < 0) {
         int64_t rec_num_from_start = header->num_records + logical_record;
@@ -96,17 +96,17 @@ static uint64_t _physical_record_for_logical_record(cdb_header_t *header, int64_
         return 0;
     }
 
-    /* DRK unclear behavior here. Looks like if I specify -N where N > 
+    /* DRK unclear behavior here. Looks like if I specify -N where N >
        num_records, I get pointed to #0, but if I specify +N where N >
        num_records, it's an error */
 
     /* Nth logical record (from the beginning) maps to Mth physical record
        in the file, where:
-      
+
        m = (n+s) % N
-     
+
        s = physical record that is 0th logical record
-       N = total number of records in the db.  */  
+       N = total number of records in the db.  */
 
     physical_record = logical_record + header->start_record;
 
@@ -191,7 +191,7 @@ static int64_t _logical_record_for_time(cdb_t *cdb, cdb_time_t req_time, int64_t
         return start_logical_record;
     }
 
-    /* don't go out of bounds */ 
+    /* don't go out of bounds */
     if (start_logical_record + 1 >= num_recs) {
         return start_logical_record;
     }
@@ -249,7 +249,7 @@ static int64_t _logical_record_for_time(cdb_t *cdb, cdb_time_t req_time, int64_t
 bool _cdb_is_writable(cdb_t *cdb) {
 
     /* We can't check for the O_RDONLY bit being because its defined value is zero.
-     * i.e. there are no bits set to look for. We therefore assume 
+     * i.e. there are no bits set to look for. We therefore assume
      * O_RDONLY if neither O_WRONLY nor O_RDWR are set. */
     if (cdb->flags & O_RDWR) {
         return true;
@@ -612,7 +612,7 @@ static int _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_record
 
         int32_t multiplier = 1;
         char *frequency;
- 
+
         if ((frequency = calloc(strlen(cdb->header->units), sizeof(char))) == NULL) {
             return CDB_ENOMEM;
         }
@@ -637,7 +637,7 @@ static int _compute_scale_factor_and_num_records(cdb_t *cdb, int64_t *num_record
                 *factor = 60 * 60 * 24 * 90;
             } else if (strcmp(frequency, "year") == 0) {
                 *factor = 60 * 60 * 24 * 365;
-            } 
+            }
 
             if (*factor != 0) {
                 *factor *= multiplier;
@@ -662,7 +662,7 @@ void _compute_statistics(cdb_range_t *range, uint64_t *num_recs, cdb_record_t *r
 
     for (i = 0; i < *num_recs; i++) {
 
-        if (!isnan(records[i].value)) { 
+        if (!isnan(records[i].value)) {
 
             sum += values[valid] = records[i].value;
             valid++;
@@ -765,11 +765,11 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
 
     /*
       get the number of requested records:
-     
+
       -ve indicates n records from the beginning
       +ve indicates n records off of the end.
       0 or undef means the whole thing.
-     
+
       switch the meaning of -ve/+ve to be more array like
     */
     if (request->count != 0) {
@@ -960,7 +960,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
         }
 
         /* Walk our list of cooked records, jumping ahead by the given step.
-           For each set of records within that step, we want to get the average 
+           For each set of records within that step, we want to get the average
            for those records and place them into a new array.
          */
         for (i = 0; i < walkend; i += step) {
@@ -1070,7 +1070,7 @@ void cdb_print_records(cdb_t *cdb, cdb_request_t *request, FILE *fh, const char 
 
     uint64_t i = 0;
     uint64_t num_recs = 0;
-    
+
     cdb_record_t *records = NULL;
 
     if (_cdb_read_records(cdb, request, &num_recs, &records) == CDB_SUCCESS) {
@@ -1232,7 +1232,7 @@ void cdb_print_aggregate_records(cdb_t **cdbs, int32_t num_cdbs, cdb_request_t *
 
     uint64_t i = 0;
     uint64_t num_recs = 0;
- 
+
     cdb_record_t *records = NULL;
     cdb_range_t *range = calloc(1, sizeof(cdb_range_t));
 
