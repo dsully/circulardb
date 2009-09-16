@@ -1277,7 +1277,7 @@ void cdb_generate_header(cdb_t *cdb, char* name, char* desc, uint64_t max_record
     memset(cdb->header->token, 0, sizeof(cdb->header->token));
 
     strncpy(cdb->header->name, name, sizeof(cdb->header->name));
-    strncpy(cdb->header->desc, name, sizeof(cdb->header->desc));
+    strncpy(cdb->header->desc, desc, sizeof(cdb->header->desc));
     strncpy(cdb->header->units, units, sizeof(cdb->header->units));
     strncpy(cdb->header->version, CDB_VERSION, sizeof(cdb->header->version));
     strncpy(cdb->header->token, CDB_TOKEN, sizeof(cdb->header->token));
