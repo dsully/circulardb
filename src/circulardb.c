@@ -444,7 +444,7 @@ bool cdb_write_record(cdb_t *cdb, cdb_time_t time, double value) {
     record->time  = time;
     record->value = value;
 
-    if (cdb_write_records(cdb, record, 1, &num_recs) != 0) {
+    if (cdb_write_records(cdb, record, 1, &num_recs) != CDB_SUCCESS) {
         return false;
     }
 
