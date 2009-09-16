@@ -360,8 +360,8 @@ int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t 
     */
     uint64_t i   = 0;
     uint64_t j   = 0;
-    *num_recs    = 0;
     off_t offset = 0;
+    *num_recs    = 0;
 
     if (cdb_read_header(cdb) != CDB_SUCCESS) {
         return cdb_error();
