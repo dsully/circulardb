@@ -1306,6 +1306,7 @@ cdb_t* cdb_new(void) {
 
 cdb_request_t cdb_new_request(void) {
     cdb_request_t request;
+    memset (&request, 0, sizeof (request));
     request.start  = 0;
     request.end    = 0;
     request.count  = 0;
