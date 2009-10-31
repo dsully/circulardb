@@ -23,7 +23,7 @@ char* format_time(time_t time) {
 void validate(cdb_t *cdb) {
   cout << "Working on: " << cdb->filename << endl;
 
-  /* Check for exceptional conditions */ 
+  /* Check for exceptional conditions */
   if (cdb_read_header(cdb) != CDB_SUCCESS) {
     cout << "Couldn't read header for: " << cdb->filename << endl;
     return;
@@ -48,7 +48,7 @@ void validate(cdb_t *cdb) {
   cdb_request_t request = cdb_new_request();
   cdb_record_t *records = NULL;
 
-  /* We want to check against raw data for counters */ 
+  /* We want to check against raw data for counters */
   request.cooked = false;
 
   cdb_read_records(cdb, &request, &num_recs, &records, range);
@@ -119,7 +119,6 @@ int main(int argc, char** argv) {
       cdb_t *cdb = cdb_new();
       cdb->filename = argv[i];
       cdb->flags = O_RDONLY;
-      cdb_read_header(cdb);
 
       ret = cdb_read_header(cdb);
 

@@ -15,4 +15,6 @@ Documentation needs creating / improving.
 
 BSD License.
 
+Use autoreconf --install to update autotools.
+
 --dan

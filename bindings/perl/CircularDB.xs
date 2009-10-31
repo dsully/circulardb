@@ -39,14 +39,28 @@ cdb_range_t* extract_range_ptr(SV *self) {
 
 void _check_return(int ret) {
   switch (ret) {
-    case CDB_SUCCESS : break;
-    case CDB_ETMRANGE: warn("End time must be >= Start time.\n");
-    case CDB_ESANITY : warn("Database is unsynced.\n");
-    case CDB_ENOMEM  : warn("No memory could be allocated.\n");
-    case CDB_ENORECS : warn("There were no records in the database to be read.\n");
-    case CDB_EINTERPD: warn("Aggregate driver issue. Possibly no records!\n");
-    case CDB_EINTERPF: warn("Aggregate follower issue. Possibly no records!\n");
-    default          : warn("An unknown CircularDB error occured. Errno: %s\n", strerror(errno));
+    case CDB_SUCCESS:
+      break;
+    case CDB_ETMRANGE:
+      warn("End time must be >= Start time.\n");
+      break;
+    case CDB_ESANITY:
+      warn("Database is unsynced.\n");
+      break;
+    case CDB_ENOMEM:
+      warn("No memory could be allocated.\n");
+      break;
+    case CDB_ENORECS:
+      warn("There were no records in the database to be read.\n");
+      break;
+    case CDB_EINTERPD:
+      warn("Aggregate driver issue. Possibly no records!\n");
+      break;
+    case CDB_EINTERPF:
+      warn("Aggregate follower issue. Possibly no records!\n");
+      break;
+    default:
+      warn("An unknown CircularDB error occured. Errno: %s\n", strerror(errno));
   }
 }
 
@@ -259,9 +273,10 @@ new(class, path, ...)
   if (items >= 3 && SvOK(ST(3)))
     mode = SvIV(ST(3));
 
-  if (items >= 4 && SvOK(ST(4)))
+  if (items >= 4 && SvOK(ST(4))) {
     name = SvPV_nolen(ST(4));
     has_name = true;
+  }
 
   if (items >= 5 && SvOK(ST(5)))
     max_records = SvNV(ST(5));
@@ -290,6 +305,7 @@ new(class, path, ...)
 
   if (ret != CDB_SUCCESS) {
     warn("Couldn't open CircularDB file: %s Error: [%s]\n", path, strerror(ret));
+    cdb_free(cdb);
     XSRETURN_UNDEF;
   }
 
@@ -300,6 +316,7 @@ new(class, path, ...)
 
     if (ret != CDB_SUCCESS) {
       warn("Couldn't read header! File: %s Error: [%s]\n", path, strerror(ret));
+      cdb_free(cdb);
       XSRETURN_UNDEF;
     }
 
@@ -311,6 +328,7 @@ new(class, path, ...)
 
     if (ret != CDB_SUCCESS) {
       warn("Couldn't write header! File: %s Error: [%s]\n", path, strerror(ret));
+      cdb_free(cdb);
       XSRETURN_UNDEF;
     }
   }
