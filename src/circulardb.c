@@ -259,35 +259,36 @@ bool _cdb_is_writable(cdb_t *cdb) {
 }
 
 int cdb_read_header(cdb_t *cdb) {
+    struct stat st;
 
     /* If the header has already been read from backing store do not read again */
-    if (cdb->synced == false) {
-        struct stat st;
+    if (cdb->synced == true) {
+        return CDB_SUCCESS;
+    }
 
-        if (cdb_open(cdb) != 0) {
-            return cdb_error();
-        }
+    if (cdb_open(cdb) != 0) {
+        return cdb_error();
+    }
 
-        if (pread(cdb->fd, cdb->header, HEADER_SIZE, 0) != HEADER_SIZE) {
-            return cdb_error();
-        }
+    if (pread(cdb->fd, cdb->header, HEADER_SIZE, 0) != HEADER_SIZE) {
+        return cdb_error();
+    }
 
-        if (strncmp(cdb->header->token, CDB_TOKEN, sizeof(CDB_TOKEN)) != 0) {
-            return CDB_EBADTOK;
-        }
+    if (strncmp(cdb->header->token, CDB_TOKEN, sizeof(CDB_TOKEN)) != 0) {
+        return CDB_EBADTOK;
+    }
 
-        if (strncmp(cdb->header->version, CDB_VERSION, sizeof(CDB_VERSION)) != 0) {
-            return CDB_EBADVER;
-        }
+    if (strncmp(cdb->header->version, CDB_VERSION, sizeof(CDB_VERSION)) != 0) {
+        return CDB_EBADVER;
+    }
 
-        cdb->synced = true;
+    cdb->synced = true;
 
-        /* Calculate the number of records */
-        if (fstat(cdb->fd, &st) == 0) {
-            cdb->header->num_records = (st.st_size - HEADER_SIZE) / RECORD_SIZE;
-        } else {
-            cdb->header->num_records = 0;
-        }
+    /* Calculate the number of records */
+    if (fstat(cdb->fd, &st) == 0) {
+        cdb->header->num_records = (st.st_size - HEADER_SIZE) / RECORD_SIZE;
+    } else {
+        cdb->header->num_records = 0;
     }
 
     return CDB_SUCCESS;
@@ -360,8 +361,8 @@ int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t 
     */
     uint64_t i   = 0;
     uint64_t j   = 0;
-    *num_recs    = 0;
     off_t offset = 0;
+    *num_recs    = 0;
 
     if (cdb_read_header(cdb) != CDB_SUCCESS) {
         return cdb_error();
@@ -444,7 +445,7 @@ bool cdb_write_record(cdb_t *cdb, cdb_time_t time, double value) {
     record->time  = time;
     record->value = value;
 
-    if (cdb_write_records(cdb, record, 1, &num_recs) != 0) {
+    if (cdb_write_records(cdb, record, 1, &num_recs) != CDB_SUCCESS) {
         return false;
     }
 
@@ -1277,7 +1278,7 @@ void cdb_generate_header(cdb_t *cdb, char* name, char* desc, uint64_t max_record
     memset(cdb->header->token, 0, sizeof(cdb->header->token));
 
     strncpy(cdb->header->name, name, sizeof(cdb->header->name));
-    strncpy(cdb->header->desc, name, sizeof(cdb->header->desc));
+    strncpy(cdb->header->desc, desc, sizeof(cdb->header->desc));
     strncpy(cdb->header->units, units, sizeof(cdb->header->units));
     strncpy(cdb->header->version, CDB_VERSION, sizeof(cdb->header->version));
     strncpy(cdb->header->token, CDB_TOKEN, sizeof(cdb->header->token));
@@ -1306,6 +1307,7 @@ cdb_t* cdb_new(void) {
 
 cdb_request_t cdb_new_request(void) {
     cdb_request_t request;
+    memset (&request, 0, sizeof (request));
     request.start  = 0;
     request.end    = 0;
     request.count  = 0;
@@ -1316,27 +1318,28 @@ cdb_request_t cdb_new_request(void) {
 
 int cdb_open(cdb_t *cdb) {
 
+    if (cdb->fd >= 0) {
+        return CDB_SUCCESS;
+    }
+
+    /* Default flags if none were set */
+    if (cdb->flags == -1) {
+        cdb->flags = O_RDONLY|O_BINARY;
+    }
+
+    /* A cdb can't be write only - we need to read the header */
+    if (cdb->flags & O_WRONLY) {
+        cdb->flags = O_RDWR;
+    }
+
+    if (cdb->mode == -1) {
+        cdb->mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+    }
+
+    cdb->fd = open(cdb->filename, cdb->flags, cdb->mode);
+
     if (cdb->fd < 0) {
-
-        /* Default flags if none were set */
-        if (cdb->flags == -1) {
-            cdb->flags = O_RDONLY|O_BINARY;
-        }
-
-        /* A cdb can't be write only - we need to read the header */
-        if (cdb->flags & O_WRONLY) {
-            cdb->flags = O_RDWR;
-        }
-
-        if (cdb->mode == -1) {
-            cdb->mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-        }
-
-        cdb->fd = open(cdb->filename, cdb->flags, cdb->mode);
-
-        if (cdb->fd < 0) {
-            return cdb_error();
-        }
+        return cdb_error();
     }
 
     return CDB_SUCCESS;
