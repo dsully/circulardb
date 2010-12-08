@@ -1,0 +1,34 @@
+# http://www.gnu.org/software/automake
+Makefile
+Makefile.in
+
+# http://www.gnu.org/software/autoconf
+/autom4te.cache
+/aclocal.m4
+/compile
+/config.h
+/config.log
+/configure
+/depcomp
+/install-sh
+/libtool
+/missing
+/stamp-h1
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+
+# Compiled Dynamic libraries
+*.so
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+
+.deps
+
+# Ruby/C turds
+mkmf.log

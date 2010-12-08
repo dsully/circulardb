@@ -56,11 +56,11 @@ typedef struct cdb_header_s {
     char        name[128];          // "short name" for this database
     char        desc[512];          // a longer description of this database.
     char        units[64];          // bytes, percent, seconds, etc
-    int         type;               // Defined above
+    int32_t     type;               // Defined above
     double      min_value;          // Values outside this range will be ignored/dropped
     double      max_value;          // Set both to 0 to disable.
     uint64_t    max_records;        // Maximum records this CDB can hold before cycling.
-    int         interval;           // Interval that we expect to see data at.
+    int32_t     interval;           // Interval that we expect to see data at.
     uint64_t    start_record;       // Pointer to the logical start record
     uint64_t    num_records;
 } cdb_header_t;
@@ -89,7 +89,7 @@ typedef struct cdb_request_s {
     cdb_time_t end;
     int64_t count; /* number of records requested */
     bool cooked;   /* For counter types, do the math */
-    long step;     /* Request averaged data */
+    uint32_t step;     /* Request averaged data */
 } cdb_request_t;
 
 /* Hold all the stats for a particular time range, so this computation can be
@@ -153,7 +153,7 @@ int cdb_read_header(cdb_t *cdb);
 /* Return CDB_SUCCESS, CDB_ERDONLY or errno */
 int cdb_write_header(cdb_t *cdb);
 
-void cdb_generate_header(cdb_t *cdb, char* name, char* desc, uint64_t max_records, int type,
+void cdb_generate_header(cdb_t *cdb, char* name, char* desc, uint64_t max_records, int32_t type,
     char* units, uint64_t min_value, uint64_t max_value, int interval);
 
 /* Return CDB_SUCCESS, CDB_ERDONLY, CDB_EINVMAX or errno */

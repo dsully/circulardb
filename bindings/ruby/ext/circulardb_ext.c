@@ -46,14 +46,28 @@ static VALUE _parse_time(VALUE time) {
 void _check_return(int ret) {
 
     switch (ret) {
-        case CDB_SUCCESS : break;
-        case CDB_ETMRANGE: rb_raise(rb_eArgError, "End time must be >= Start time.");
-        case CDB_ESANITY : rb_raise(rb_eStandardError, "Database is unsynced.");
-        case CDB_ENOMEM  : rb_raise(rb_eNoMemError, "No memory could be allocated.");
-        case CDB_ENORECS : rb_raise(rb_eRangeError, "There were no records in the database to be read.");
-        case CDB_EINTERPD: rb_raise(rb_eRuntimeError, "Aggregate driver issue. Possibly no records!");
-        case CDB_EINTERPF: rb_raise(rb_eRuntimeError, "Aggregate follower issue. Possibly no records!");
-        default          : rb_sys_fail(0);
+        case CDB_SUCCESS:
+          break;
+        case CDB_ETMRANGE:
+          rb_raise(rb_eArgError, "End time must be >= Start time.");
+          break;
+        case CDB_ESANITY:
+          rb_raise(rb_eStandardError, "Database is unsynced.");
+          break;
+        case CDB_ENOMEM:
+          rb_raise(rb_eNoMemError, "No memory could be allocated.");
+          break;
+        case CDB_ENORECS:
+          rb_raise(rb_eRangeError, "There were no records in the database to be read.");
+          break;
+        case CDB_EINTERPD:
+          rb_raise(rb_eRuntimeError, "Aggregate driver issue. Possibly no records!");
+          break;
+        case CDB_EINTERPF:
+          rb_raise(rb_eRuntimeError, "Aggregate follower issue. Possibly no records!");
+          break;
+        default:
+          rb_sys_fail(0);
     }
 }
 

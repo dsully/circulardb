@@ -9,7 +9,7 @@ check-local:
 	$(MAKE) -f Makefile-perl.mk test
 
 install-exec-local: Makefile-perl.mk
-	$(MAKE) -f Makefile-perl.mk install DESTDIR=$(DESTDIR)/
+	$(MAKE) -f Makefile-perl.mk install DESTDIR=$(DESTDIR)$(prefix)
 
 clean-local:
 	if test -f Makefile-perl.mk ; then \
