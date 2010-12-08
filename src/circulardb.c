@@ -25,7 +25,7 @@
 #include <time.h>
 #include <unistd.h>
 
-/* For the aggretgation interface */
+/* For the aggregation interface */
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_interp.h>
 #include <gsl/gsl_sort.h>
@@ -37,8 +37,6 @@
 #ifndef O_BINARY
 #define O_BINARY 0
 #endif
-
-/* DRK general: why not mmap the arena and treat it as an array to avoid all the "* RECORD_SIZE" */
 
 /* Save away errno so it doesn't get overwritten */
 int cdb_error(void) {
@@ -314,19 +312,6 @@ int cdb_write_header(cdb_t *cdb) {
         return cdb_error();
     }
 
-    /* This really slows down moneypenny - we're ok with trusting the VFS
-     * right now. */
-    /* OS X doesn't have fdatasync() */
-#if 0
-#ifdef HAVE_FDATASYNC
-    if (fdatasync(cdb->fd) != 0) return cdb_error();
-#else
-#ifdef HAVE_FSYNC
-    if (fsync(cdb->fd) != 0) return cdb_error();
-#endif
-#endif
-#endif
-
     cdb->synced = true;
 
     return CDB_SUCCESS;
@@ -405,6 +390,7 @@ int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t 
     if (j > 0) {
 
         offset = HEADER_SIZE + (cdb->header->start_record * RECORD_SIZE);
+
         cdb->header->start_record += j;
         cdb->header->start_record %= cdb->header->max_records;
 
@@ -742,7 +728,6 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
     int64_t first_requested_logical_record;
     int64_t last_requested_logical_record;
     uint64_t last_requested_physical_record;
-    int64_t seek_logical_record;
     int64_t seek_physical_record;
 
     cdb_record_t *buffer = NULL;
@@ -809,8 +794,8 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
 
     last_requested_physical_record = (last_requested_logical_record + cdb->header->start_record) % cdb->header->num_records;
 
-    seek_logical_record  = first_requested_logical_record;
-    seek_physical_record = _seek_to_logical_record(cdb, seek_logical_record);
+    /* After _seek_to_logical_record(), we're at the offset to read from. */
+    seek_physical_record = _seek_to_logical_record(cdb, first_requested_logical_record);
 
     if (last_requested_physical_record >= seek_physical_record) {
 
@@ -822,7 +807,6 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
             return CDB_ENOMEM;
         }
 
-        /* one slurp - XXX TODO - mmap */
         if (read(cdb->fd, buffer, rlen) != rlen) {
             free(buffer);
             return cdb_error();
@@ -844,11 +828,13 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
             return CDB_ENOMEM;
         }
 
+        /* Read at the offset set by _seek_to_logical_record() */
         if (read(cdb->fd, buffer, rlen1) != rlen1) {
             free(buffer);
             return cdb_error();
         }
 
+        /* And then the wrap around portion past the header. */
         if (pread(cdb->fd, &buffer[nrec1], rlen2, HEADER_SIZE) != rlen2) {
             free(buffer);
             return cdb_error();
@@ -972,7 +958,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
 
             for (j = 0; j < step; j++) {
 
-                /* No NaNs on average - they make bogus graphs. Is there a
+                /* No NaNs on average - they cause bogus graphs. Is there a
                  * better value than 0 to use here? */
                 if (isnan(buffer[i+j].value)) {
                     buffer[i+j].value = 0;
@@ -987,7 +973,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
             step_recs += 1;
         }
 
-        /* Now collect from the last step point to the end and average. */
+        /* Now collect from the last step point to the end & average. */
         if (leftover > 0) {
             uint64_t leftover_start = *num_recs - leftover;
 
@@ -997,7 +983,7 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
 
             for (i = leftover_start; i < *num_recs; i++) {
 
-                /* No NaNs on average - they make bogus graphs. Is there a
+                /* No NaNs on average - they cause bogus graphs. Is there a
                  * better value than 0 to use here? */
                 if (isnan(buffer[i].value)) {
                     buffer[i].value = 0;
@@ -1024,7 +1010,6 @@ static int _cdb_read_records(cdb_t *cdb, cdb_request_t *request, uint64_t *num_r
         uint64_t start_index = 0;
 
         if (request->count <= 0) {
-
             start_index = *num_recs - abs(request->count);
         }
 
@@ -1181,7 +1166,7 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *reques
         ret = _cdb_read_records(cdbs[i], request, &follower_num_recs, &follower_records);
 
         /* Just bail, free all allocations below and let the error bubble up */
-        if (follower_num_recs != 0) {
+        if (ret == CDB_SUCCESS && follower_num_recs != 0) {
 
             for (j = 0; j < *driver_num_recs; j++) {
 
@@ -1204,9 +1189,11 @@ int cdb_read_aggregate_records(cdb_t **cdbs, int num_cdbs, cdb_request_t *reques
             }
         }
 
-        ret = CDB_SUCCESS;
-
         free(follower_records);
+
+        if (ret != CDB_SUCCESS) {
+            break;
+        }
     }
 
     if (ret == CDB_SUCCESS && *driver_num_recs > 0) {
