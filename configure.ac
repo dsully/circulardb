@@ -71,7 +71,7 @@ AC_SUBST(ENABLE_HARDCORE)
 AC_MSG_CHECKING([for Darwin (Mac OS X)])
 if test "`(uname) 2>/dev/null`" = Darwin; then
 
-  ENVARGS="ARCHFLAGS=\"-arch `/usr/bin/arch`\""
+  ENVARGS="ARCHFLAGS=\"-arch `/usr/bin/uname -m`\""
 else
   AC_MSG_RESULT(no)
 fi
@@ -128,6 +128,7 @@ fi
 # Checks for library functions.
 AC_FUNC_MALLOC
 AC_FUNC_ALLOCA
+AC_FUNC_CALLOC
 AC_FUNC_STAT
 AC_FUNC_MMAP
 AC_FUNC_STRFTIME

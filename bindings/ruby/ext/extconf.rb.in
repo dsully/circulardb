@@ -1,8 +1,5 @@
 #!/usr/bin/env ruby
 
-# Setup for OS X.
-ENV['RC_ARCHS'] = %x(arch)
-
 require 'rbconfig'
 require 'mkmf'
 require 'fileutils'
