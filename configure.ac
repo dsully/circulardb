@@ -144,6 +144,7 @@ AC_CONFIG_FILES([
     bindings/perl/Makefile
     bindings/perl/Makefile.PL
     bindings/python/Makefile
+    bindings/python/setup.py
     bindings/ruby/Makefile
     bindings/ruby/ext/extconf.rb
     src/Makefile

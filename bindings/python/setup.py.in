@@ -1,0 +1,18 @@
+from distutils.core import setup, Extension
+
+setup(
+  name        = "@PACKAGE_NAME@",
+  version     = "@PACKAGE_VERSION@",
+  description = "CircularDB Python Binding",
+  author      = "Dan Sully",
+  url         = "http://github.com/dsully/circulardb",
+
+  ext_modules = [ Extension("circulardb", ["circulardb.c"],
+    define_macros      = [],
+    libraries          = ["circulardb"],
+    include_dirs       = ["@top_srcdir@/include"],
+    library_dirs       = ["@top_srcdir@/src/.libs"],
+    extra_compile_args = ["@CFLAGS@", "-Wall", "-Wpointer-arith"],
+    extra_link_args    = ["@GSL_LIBS@"],
+  ) ]
+)

@@ -16518,7 +16518,7 @@ rm -f core conftest.err conftest.$ac_objext \
   rm -f conf.gsltest
 
 
-ac_config_files="$ac_config_files Makefile bindings/Makefile bindings/perl/Makefile bindings/perl/Makefile.PL bindings/python/Makefile bindings/ruby/Makefile bindings/ruby/ext/extconf.rb src/Makefile tests/Makefile include/Makefile"
+ac_config_files="$ac_config_files Makefile bindings/Makefile bindings/perl/Makefile bindings/perl/Makefile.PL bindings/python/Makefile bindings/python/setup.py bindings/ruby/Makefile bindings/ruby/ext/extconf.rb src/Makefile tests/Makefile include/Makefile"
 
 
 cat >confcache <<\_ACEOF
@@ -17621,6 +17621,7 @@ do
     "bindings/perl/Makefile") CONFIG_FILES="$CONFIG_FILES bindings/perl/Makefile" ;;
     "bindings/perl/Makefile.PL") CONFIG_FILES="$CONFIG_FILES bindings/perl/Makefile.PL" ;;
     "bindings/python/Makefile") CONFIG_FILES="$CONFIG_FILES bindings/python/Makefile" ;;
+    "bindings/python/setup.py") CONFIG_FILES="$CONFIG_FILES bindings/python/setup.py" ;;
     "bindings/ruby/Makefile") CONFIG_FILES="$CONFIG_FILES bindings/ruby/Makefile" ;;
     "bindings/ruby/ext/extconf.rb") CONFIG_FILES="$CONFIG_FILES bindings/ruby/ext/extconf.rb" ;;
     "src/Makefile") CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
