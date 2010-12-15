@@ -1,8 +1,8 @@
 all-local:
-	python setup.py build_ext --inplace --debug
+	$(ENVARGS) python setup.py build_ext --inplace --debug
 
 install-exec-hook:
-	python setup.py install
+	$(ENVARGS) python setup.py install
 
 clean-local:
 

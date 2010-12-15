@@ -71,7 +71,7 @@ AC_SUBST(ENABLE_HARDCORE)
 AC_MSG_CHECKING([for Darwin (Mac OS X)])
 if test "`(uname) 2>/dev/null`" = Darwin; then
 
-  ENVARGS="ARCHFLAGS=\"-arch `/usr/bin/arch`\""
+  ENVARGS="ARCHFLAGS=\"-arch `/usr/bin/uname -m`\""
 else
   AC_MSG_RESULT(no)
 fi

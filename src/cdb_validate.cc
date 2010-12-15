@@ -6,7 +6,12 @@
 #include <vector>
 
 #include <fcntl.h>
+
+/* For calloc on Linux */
+#ifdef _GNU_SOURCE
 #include <malloc.h>
+#endif
+
 #include "circulardb_interface.h"
 
 using namespace std;
