@@ -746,9 +746,13 @@ ac_header_list=
 ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
+CHECK_LIBS
+CHECK_CFLAGS
 GSL_LIBS
 GSL_CFLAGS
-GSL_CONFIG
+PKG_CONFIG_LIBDIR
+PKG_CONFIG_PATH
+PKG_CONFIG
 ALLOCA
 LIBOBJS
 WITH_RUBY_FALSE
@@ -906,9 +910,6 @@ enable_hardcore
 with_py
 with_perl
 with_ruby
-with_gsl_prefix
-with_gsl_exec_prefix
-enable_gsltest
 '
       ac_precious_vars='build_alias
 host_alias
@@ -922,7 +923,14 @@ CPP
 CXX
 CXXFLAGS
 CCC
-CXXCPP'
+CXXCPP
+PKG_CONFIG
+PKG_CONFIG_PATH
+PKG_CONFIG_LIBDIR
+GSL_CFLAGS
+GSL_LIBS
+CHECK_CFLAGS
+CHECK_LIBS'
 
 
 # Initialize some variables set by options.
@@ -1555,7 +1563,6 @@ Optional Features:
   --disable-libtool-lock  avoid locking (might break parallel builds)
   --enable-debug          disable optimizations and inlining [default=no]
   --enable-hardcore       turn on strong warning enforcement [default=yes]
-  --disable-gsltest       Do not try to compile and run a test GSL program
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -1566,8 +1573,6 @@ Optional Packages:
   --with-py               build the Python library [default=yes]
   --with-perl             build the Perl library [default=yes]
   --with-ruby             build the Ruby library [default=yes]
-  --with-gsl-prefix=PFX   Prefix where GSL is installed (optional)
-  --with-gsl-exec-prefix=PFX Exec prefix where GSL is installed (optional)
 
 Some influential environment variables:
   CC          C compiler command
@@ -1581,6 +1586,16 @@ Some influential environment variables:
   CXX         C++ compiler command
   CXXFLAGS    C++ compiler flags
   CXXCPP      C++ preprocessor
+  PKG_CONFIG  path to pkg-config utility
+  PKG_CONFIG_PATH
+              directories to add to pkg-config's search path
+  PKG_CONFIG_LIBDIR
+              path overriding pkg-config's built-in search path
+  GSL_CFLAGS  C compiler flags for GSL, overriding pkg-config
+  GSL_LIBS    linker flags for GSL, overriding pkg-config
+  CHECK_CFLAGS
+              C compiler flags for CHECK, overriding pkg-config
+  CHECK_LIBS  linker flags for CHECK, overriding pkg-config
 
 Use these variables to override the choices made by `configure' or to help
 it to find libraries and programs with nonstandard names/locations.
@@ -5603,13 +5618,13 @@ if test "${lt_cv_nm_interface+set}" = set; then :
 else
   lt_cv_nm_interface="BSD nm"
   echo "int some_variable = 0;" > conftest.$ac_ext
-  (eval echo "\"\$as_me:5606: $ac_compile\"" >&5)
+  (eval echo "\"\$as_me:5621: $ac_compile\"" >&5)
   (eval "$ac_compile" 2>conftest.err)
   cat conftest.err >&5
-  (eval echo "\"\$as_me:5609: $NM \\\"conftest.$ac_objext\\\"\"" >&5)
+  (eval echo "\"\$as_me:5624: $NM \\\"conftest.$ac_objext\\\"\"" >&5)
   (eval "$NM \"conftest.$ac_objext\"" 2>conftest.err > conftest.out)
   cat conftest.err >&5
-  (eval echo "\"\$as_me:5612: output\"" >&5)
+  (eval echo "\"\$as_me:5627: output\"" >&5)
   cat conftest.out >&5
   if $GREP 'External.*some_variable' conftest.out > /dev/null; then
     lt_cv_nm_interface="MS dumpbin"
@@ -6815,7 +6830,7 @@ ia64-*-hpux*)
   ;;
 *-*-irix6*)
   # Find out which ABI we are using.
-  echo '#line 6818 "configure"' > conftest.$ac_ext
+  echo '#line 6833 "configure"' > conftest.$ac_ext
   if { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_compile\""; } >&5
   (eval $ac_compile) 2>&5
   ac_status=$?
@@ -8730,11 +8745,11 @@ else
    -e 's:.*FLAGS}\{0,1\} :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:8733: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:8748: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:8737: \$? = $ac_status" >&5
+   echo "$as_me:8752: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings other than the usual output.
@@ -9069,11 +9084,11 @@ else
    -e 's:.*FLAGS}\{0,1\} :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:9072: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:9087: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:9076: \$? = $ac_status" >&5
+   echo "$as_me:9091: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings other than the usual output.
@@ -9174,11 +9189,11 @@ else
    -e 's:.*FLAGS}\{0,1\} :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:9177: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:9192: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>out/conftest.err)
    ac_status=$?
    cat out/conftest.err >&5
-   echo "$as_me:9181: \$? = $ac_status" >&5
+   echo "$as_me:9196: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s out/conftest2.$ac_objext
    then
      # The compiler can only warn and ignore the option if not recognized
@@ -9229,11 +9244,11 @@ else
    -e 's:.*FLAGS}\{0,1\} :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:9232: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:9247: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>out/conftest.err)
    ac_status=$?
    cat out/conftest.err >&5
-   echo "$as_me:9236: \$? = $ac_status" >&5
+   echo "$as_me:9251: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s out/conftest2.$ac_objext
    then
      # The compiler can only warn and ignore the option if not recognized
@@ -11613,7 +11628,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 11616 "configure"
+#line 11631 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -11709,7 +11724,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 11712 "configure"
+#line 11727 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -13665,11 +13680,11 @@ else
    -e 's:.*FLAGS}\{0,1\} :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:13668: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:13683: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:13672: \$? = $ac_status" >&5
+   echo "$as_me:13687: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings other than the usual output.
@@ -13764,11 +13779,11 @@ else
    -e 's:.*FLAGS}\{0,1\} :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:13767: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:13782: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>out/conftest.err)
    ac_status=$?
    cat out/conftest.err >&5
-   echo "$as_me:13771: \$? = $ac_status" >&5
+   echo "$as_me:13786: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s out/conftest2.$ac_objext
    then
      # The compiler can only warn and ignore the option if not recognized
@@ -13816,11 +13831,11 @@ else
    -e 's:.*FLAGS}\{0,1\} :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:13819: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:13834: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>out/conftest.err)
    ac_status=$?
    cat out/conftest.err >&5
-   echo "$as_me:13823: \$? = $ac_status" >&5
+   echo "$as_me:13838: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s out/conftest2.$ac_objext
    then
      # The compiler can only warn and ignore the option if not recognized
@@ -16253,68 +16268,30 @@ fi
 fi
 done
 
-for ac_func in strerror pread pwrite memset pow
-do :
-  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
-ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
-if eval test \"x\$"$as_ac_var"\" = x"yes"; then :
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
-_ACEOF
-
-fi
-done
-
 
 
 $as_echo "#define _GNU_SOURCE 1" >>confdefs.h
 
 
-# Check for GSL
+# Check for external dependencies
 
 
-# Check whether --with-gsl-prefix was given.
-if test "${with_gsl_prefix+set}" = set; then :
-  withval=$with_gsl_prefix; gsl_prefix="$withval"
-else
-  gsl_prefix=""
-fi
 
 
-# Check whether --with-gsl-exec-prefix was given.
-if test "${with_gsl_exec_prefix+set}" = set; then :
-  withval=$with_gsl_exec_prefix; gsl_exec_prefix="$withval"
-else
-  gsl_exec_prefix=""
-fi
-
-# Check whether --enable-gsltest was given.
-if test "${enable_gsltest+set}" = set; then :
-  enableval=$enable_gsltest;
-else
-  enable_gsltest=yes
-fi
 
 
-  if test "x${GSL_CONFIG+set}" != xset ; then
-     if test "x$gsl_prefix" != x ; then
-         GSL_CONFIG="$gsl_prefix/bin/gsl-config"
-     fi
-     if test "x$gsl_exec_prefix" != x ; then
-        GSL_CONFIG="$gsl_exec_prefix/bin/gsl-config"
-     fi
-  fi
-
-  # Extract the first word of "gsl-config", so it can be a program name with args.
-set dummy gsl-config; ac_word=$2
+if test "x$ac_cv_env_PKG_CONFIG_set" != "xset"; then
+	if test -n "$ac_tool_prefix"; then
+  # Extract the first word of "${ac_tool_prefix}pkg-config", so it can be a program name with args.
+set dummy ${ac_tool_prefix}pkg-config; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_path_GSL_CONFIG+set}" = set; then :
+if test "${ac_cv_path_PKG_CONFIG+set}" = set; then :
   $as_echo_n "(cached) " >&6
 else
-  case $GSL_CONFIG in
+  case $PKG_CONFIG in
   [\\/]* | ?:[\\/]*)
-  ac_cv_path_GSL_CONFIG="$GSL_CONFIG" # Let the user override the test with a path.
+  ac_cv_path_PKG_CONFIG="$PKG_CONFIG" # Let the user override the test with a path.
   ;;
   *)
   as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
@@ -16324,7 +16301,7 @@ do
   test -z "$as_dir" && as_dir=.
     for ac_exec_ext in '' $ac_executable_extensions; do
   if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_GSL_CONFIG="$as_dir/$ac_word$ac_exec_ext"
+    ac_cv_path_PKG_CONFIG="$as_dir/$ac_word$ac_exec_ext"
     $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
     break 2
   fi
@@ -16332,191 +16309,268 @@ done
   done
 IFS=$as_save_IFS
 
-  test -z "$ac_cv_path_GSL_CONFIG" && ac_cv_path_GSL_CONFIG="no"
   ;;
 esac
 fi
-GSL_CONFIG=$ac_cv_path_GSL_CONFIG
-if test -n "$GSL_CONFIG"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $GSL_CONFIG" >&5
-$as_echo "$GSL_CONFIG" >&6; }
+PKG_CONFIG=$ac_cv_path_PKG_CONFIG
+if test -n "$PKG_CONFIG"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PKG_CONFIG" >&5
+$as_echo "$PKG_CONFIG" >&6; }
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
 fi
 
 
-  min_gsl_version=0.2.5
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for GSL - version >= $min_gsl_version" >&5
-$as_echo_n "checking for GSL - version >= $min_gsl_version... " >&6; }
-  no_gsl=""
-  if test "$GSL_CONFIG" = "no" ; then
-    no_gsl=yes
-  else
-    GSL_CFLAGS=`$GSL_CONFIG --cflags`
-    GSL_LIBS=`$GSL_CONFIG --libs`
-
-    gsl_major_version=`$GSL_CONFIG --version | \
-           sed 's/^\([0-9]*\).*/\1/'`
-    if test "x${gsl_major_version}" = "x" ; then
-       gsl_major_version=0
-    fi
-
-    gsl_minor_version=`$GSL_CONFIG --version | \
-           sed 's/^\([0-9]*\)\.\{0,1\}\([0-9]*\).*/\2/'`
-    if test "x${gsl_minor_version}" = "x" ; then
-       gsl_minor_version=0
-    fi
-
-    gsl_micro_version=`$GSL_CONFIG --version | \
-           sed 's/^\([0-9]*\)\.\{0,1\}\([0-9]*\)\.\{0,1\}\([0-9]*\).*/\3/'`
-    if test "x${gsl_micro_version}" = "x" ; then
-       gsl_micro_version=0
-    fi
-
-    if test "x$enable_gsltest" = "xyes" ; then
-      ac_save_CFLAGS="$CFLAGS"
-      ac_save_LIBS="$LIBS"
-      CFLAGS="$CFLAGS $GSL_CFLAGS"
-      LIBS="$LIBS $GSL_LIBS"
-
-      rm -f conf.gsltest
-      if test "$cross_compiling" = yes; then :
-  echo $ac_n "cross compiling; assumed OK... $ac_c"
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-char* my_strdup (const char *str);
-
-char*
-my_strdup (const char *str)
-{
-  char *new_str;
-
-  if (str)
-    {
-      new_str = (char *)malloc ((strlen (str) + 1) * sizeof(char));
-      strcpy (new_str, str);
-    }
-  else
-    new_str = NULL;
-
-  return new_str;
-}
-
-int main (void)
-{
-  int major = 0, minor = 0, micro = 0;
-  int n;
-  int ret;
-  char *tmp_version;
-
-  ret = system ("touch conf.gsltest");
-
-  /* HP/UX 9 (%@#!) writes to sscanf strings */
-  tmp_version = my_strdup("$min_gsl_version");
-
-  n = sscanf(tmp_version, "%d.%d.%d", &major, &minor, &micro) ;
-
-  if (n != 2 && n != 3) {
-     printf("%s, bad version string\n", "$min_gsl_version");
-     exit(1);
-   }
-
-   if (($gsl_major_version > major) ||
-      (($gsl_major_version == major) && ($gsl_minor_version > minor)) ||
-      (($gsl_major_version == major) && ($gsl_minor_version == minor) && ($gsl_micro_version >= micro)))
-     {
-       exit(0);
-     }
-   else
-     {
-       exit(1);
-     }
-}
-
-
-_ACEOF
-if ac_fn_c_try_run "$LINENO"; then :
-
-else
-  no_gsl=yes
 fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
-       CFLAGS="$ac_save_CFLAGS"
-       LIBS="$ac_save_LIBS"
-     fi
+if test -z "$ac_cv_path_PKG_CONFIG"; then
+  ac_pt_PKG_CONFIG=$PKG_CONFIG
+  # Extract the first word of "pkg-config", so it can be a program name with args.
+set dummy pkg-config; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if test "${ac_cv_path_ac_pt_PKG_CONFIG+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $ac_pt_PKG_CONFIG in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_ac_pt_PKG_CONFIG="$ac_pt_PKG_CONFIG" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_path_ac_pt_PKG_CONFIG="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
   fi
-  if test "x$no_gsl" = x ; then
-     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-     :
-  else
-     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+ac_pt_PKG_CONFIG=$ac_cv_path_ac_pt_PKG_CONFIG
+if test -n "$ac_pt_PKG_CONFIG"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_pt_PKG_CONFIG" >&5
+$as_echo "$ac_pt_PKG_CONFIG" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-     if test "$GSL_CONFIG" = "no" ; then
-       echo "*** The gsl-config script installed by GSL could not be found"
-       echo "*** If GSL was installed in PREFIX, make sure PREFIX/bin is in"
-       echo "*** your path, or set the GSL_CONFIG environment variable to the"
-       echo "*** full path to gsl-config."
-     else
-       if test -f conf.gsltest ; then
-        :
-       else
-          echo "*** Could not run GSL test program, checking why..."
-          CFLAGS="$CFLAGS $GSL_CFLAGS"
-          LIBS="$LIBS $GSL_LIBS"
-          cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-#include <stdio.h>
-
-int
-main ()
-{
- return 0;
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-   echo "*** The test program compiled, but did not run. This usually means"
-          echo "*** that the run-time linker is not finding GSL or finding the wrong"
-          echo "*** version of GSL. If it is not finding GSL, you'll need to set your"
-          echo "*** LD_LIBRARY_PATH environment variable, or edit /etc/ld.so.conf to point"
-          echo "*** to the installed location  Also, make sure you have run ldconfig if that"
-          echo "*** is required on your system"
-	  echo "***"
-          echo "*** If you have an old version installed, it is best to remove it, although"
-          echo "*** you may also be able to get things to work by modifying LD_LIBRARY_PATH"
-else
-   echo "*** The test program failed to compile or link. See the file config.log for the"
-          echo "*** exact error that occured. This usually means GSL was incorrectly installed"
-          echo "*** or that you have moved GSL since it was installed. In the latter case, you"
-          echo "*** may want to edit the gsl-config script: $GSL_CONFIG"
 fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-          CFLAGS="$ac_save_CFLAGS"
-          LIBS="$ac_save_LIBS"
-       fi
-     fi
-#     GSL_CFLAGS=""
-#     GSL_LIBS=""
-     :
+
+  if test "x$ac_pt_PKG_CONFIG" = x; then
+    PKG_CONFIG=""
+  else
+    case $cross_compiling:$ac_tool_warned in
+yes:)
+{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: using cross tools not prefixed with host triplet" >&5
+$as_echo "$as_me: WARNING: using cross tools not prefixed with host triplet" >&2;}
+ac_tool_warned=yes ;;
+esac
+    PKG_CONFIG=$ac_pt_PKG_CONFIG
   fi
+else
+  PKG_CONFIG="$ac_cv_path_PKG_CONFIG"
+fi
+
+fi
+if test -n "$PKG_CONFIG"; then
+	_pkg_min_version=0.9.0
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking pkg-config is at least version $_pkg_min_version" >&5
+$as_echo_n "checking pkg-config is at least version $_pkg_min_version... " >&6; }
+	if $PKG_CONFIG --atleast-pkgconfig-version $_pkg_min_version; then
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	else
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+		PKG_CONFIG=""
+	fi
+fi
+
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for GSL" >&5
+$as_echo_n "checking for GSL... " >&6; }
+
+if test -n "$GSL_CFLAGS"; then
+    pkg_cv_GSL_CFLAGS="$GSL_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"gsl\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "gsl") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_GSL_CFLAGS=`$PKG_CONFIG --cflags "gsl" 2>/dev/null`
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$GSL_LIBS"; then
+    pkg_cv_GSL_LIBS="$GSL_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"gsl\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "gsl") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_GSL_LIBS=`$PKG_CONFIG --libs "gsl" 2>/dev/null`
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
 
 
-  rm -f conf.gsltest
 
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        GSL_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors "gsl" 2>&1`
+        else
+	        GSL_PKG_ERRORS=`$PKG_CONFIG --print-errors "gsl" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$GSL_PKG_ERRORS" >&5
+
+	as_fn_error $? "Package requirements (gsl) were not met:
+
+$GSL_PKG_ERRORS
+
+Consider adjusting the PKG_CONFIG_PATH environment variable if you
+installed software in a non-standard prefix.
+
+Alternatively, you may set the environment variables GSL_CFLAGS
+and GSL_LIBS to avoid the need to call pkg-config.
+See the pkg-config man page for more details." "$LINENO" 5
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	{ { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "The pkg-config script could not be found or is too old.  Make sure it
+is in your PATH or set the PKG_CONFIG environment variable to the full
+path to pkg-config.
+
+Alternatively, you may set the environment variables GSL_CFLAGS
+and GSL_LIBS to avoid the need to call pkg-config.
+See the pkg-config man page for more details.
+
+To get pkg-config, see <http://pkg-config.freedesktop.org/>.
+See \`config.log' for more details" "$LINENO" 5 ; }
+else
+	GSL_CFLAGS=$pkg_cv_GSL_CFLAGS
+	GSL_LIBS=$pkg_cv_GSL_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+fi
+
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for CHECK" >&5
+$as_echo_n "checking for CHECK... " >&6; }
+
+if test -n "$CHECK_CFLAGS"; then
+    pkg_cv_CHECK_CFLAGS="$CHECK_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"check >= 0.9.4\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "check >= 0.9.4") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_CHECK_CFLAGS=`$PKG_CONFIG --cflags "check >= 0.9.4" 2>/dev/null`
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$CHECK_LIBS"; then
+    pkg_cv_CHECK_LIBS="$CHECK_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"check >= 0.9.4\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "check >= 0.9.4") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_CHECK_LIBS=`$PKG_CONFIG --libs "check >= 0.9.4" 2>/dev/null`
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        CHECK_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors "check >= 0.9.4" 2>&1`
+        else
+	        CHECK_PKG_ERRORS=`$PKG_CONFIG --print-errors "check >= 0.9.4" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$CHECK_PKG_ERRORS" >&5
+
+	as_fn_error $? "Package requirements (check >= 0.9.4) were not met:
+
+$CHECK_PKG_ERRORS
+
+Consider adjusting the PKG_CONFIG_PATH environment variable if you
+installed software in a non-standard prefix.
+
+Alternatively, you may set the environment variables CHECK_CFLAGS
+and CHECK_LIBS to avoid the need to call pkg-config.
+See the pkg-config man page for more details." "$LINENO" 5
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	{ { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "The pkg-config script could not be found or is too old.  Make sure it
+is in your PATH or set the PKG_CONFIG environment variable to the full
+path to pkg-config.
+
+Alternatively, you may set the environment variables CHECK_CFLAGS
+and CHECK_LIBS to avoid the need to call pkg-config.
+See the pkg-config man page for more details.
+
+To get pkg-config, see <http://pkg-config.freedesktop.org/>.
+See \`config.log' for more details" "$LINENO" 5 ; }
+else
+	CHECK_CFLAGS=$pkg_cv_CHECK_CFLAGS
+	CHECK_LIBS=$pkg_cv_CHECK_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+fi
 
 ac_config_files="$ac_config_files Makefile bindings/Makefile bindings/perl/Makefile bindings/perl/Makefile.PL bindings/python/Makefile bindings/python/setup.py bindings/ruby/Makefile bindings/ruby/ext/extconf.rb src/Makefile tests/Makefile include/Makefile"
 

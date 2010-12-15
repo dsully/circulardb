@@ -131,12 +131,12 @@ AC_FUNC_ALLOCA
 AC_FUNC_STAT
 AC_FUNC_MMAP
 AC_FUNC_STRFTIME
-AC_CHECK_FUNCS([strerror pread pwrite memset pow])
 
 AC_DEFINE(_GNU_SOURCE, 1, [GNU headers])
 
-# Check for GSL
-AX_PATH_GSL
+# Check for external dependencies
+PKG_CHECK_MODULES([GSL], [gsl])
+PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 
 AC_CONFIG_FILES([
     Makefile
