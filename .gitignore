@@ -1,6 +1,5 @@
 # http://www.gnu.org/software/automake
 Makefile
-Makefile.in
 
 # http://www.gnu.org/software/autoconf
 /autom4te.cache
@@ -16,19 +15,32 @@ Makefile.in
 /stamp-h1
 
 # Compiled Object files
+.deps
 *.slo
 *.lo
 *.o
 
 # Compiled Dynamic libraries
 *.so
+*.dylib
+*.bundle
 
 # Compiled Static libraries
 *.lai
 *.la
 *.a
 
-.deps
+# Generated files.
+bindings/perl/Makefile.PL
+bindings/perl/Makefile-perl.mk
+bindings/python/setup.py
+bindings/ruby/.config
+bindings/ruby/ext/extconf.rb
+
+# Built binaries.
+src/cdb_read
+src/cdb_validate
+tests/test_circulardb
 
 # Ruby/C turds
 mkmf.log
