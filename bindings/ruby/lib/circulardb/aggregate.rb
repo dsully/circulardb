@@ -68,10 +68,6 @@ module CircularDB
       @cdbs[0].max_value
     end
 
-    def interval
-      @cdbs[0].interval
-    end
-
     def num_records
       @cdbs[0].num_records
     end

@@ -152,9 +152,9 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
 
     cdb_t *cdb;
     VALUE header = rb_hash_new();
-    VALUE filename, flags, mode, name, max_records, num_records, type, units, min_value, max_value, interval;
+    VALUE filename, flags, mode, name, max_records, num_records, type, units, min_value, max_value;
 
-    rb_scan_args(argc, argv, "19", &filename, &flags, &mode, &name, &max_records, &type, &units, &min_value, &max_value, &interval);
+    rb_scan_args(argc, argv, "19", &filename, &flags, &mode, &name, &max_records, &type, &units, &min_value, &max_value);
 
     Data_Get_Struct(self, cdb_t, cdb);
 
@@ -183,12 +183,10 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
         num_records  = ULL2NUM(cdb->header->num_records);
         min_value    = ULL2NUM(cdb->header->min_value);
         max_value    = ULL2NUM(cdb->header->max_value);
-        interval     = ULL2NUM(cdb->header->interval);
 
     } else {
 
         if (NIL_P(max_records)) max_records = INT2FIX(0);
-        if (NIL_P(interval)) interval       = INT2FIX(0);
         if (NIL_P(min_value)) min_value     = INT2FIX(0);
         if (NIL_P(max_value)) max_value     = INT2FIX(0);
 
@@ -208,7 +206,6 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
             StringValuePtr(units),
             NUM2ULL(min_value),
             NUM2ULL(max_value),
-            NUM2INT(interval)
         );
 
         num_records = INT2FIX(0);
@@ -225,7 +222,6 @@ static VALUE cdb_rb_initialize(int argc, VALUE *argv, VALUE self) {
     rb_hash_aset(header, ID2SYM(rb_intern("max_records")), max_records);
     rb_hash_aset(header, ID2SYM(rb_intern("min_value")), min_value);
     rb_hash_aset(header, ID2SYM(rb_intern("max_value")), max_value);
-    rb_hash_aset(header, ID2SYM(rb_intern("interval")), interval);
 
     rb_iv_set(self, "@header", header);
     rb_iv_set(self, "@statistics", Qnil);
@@ -256,12 +252,6 @@ static VALUE _set_header(VALUE self, VALUE name, VALUE value) {
 
         rb_hash_aset(header, ID2SYM(rb_intern("max_value")), value);
         cdb->header->max_value = NUM2ULL(value);
-        cdb->synced = false;
-
-    } else if (strcmp(StringValuePtr(name), "interval") == 0) {
-
-        rb_hash_aset(header, ID2SYM(rb_intern("interval")), value);
-        cdb->header->interval = NUM2ULL(value);
         cdb->synced = false;
 
     } else if (strcmp(StringValuePtr(name), "units") == 0) {

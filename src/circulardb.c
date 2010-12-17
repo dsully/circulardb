@@ -1236,14 +1236,10 @@ void cdb_print_aggregate_records(cdb_t **cdbs, int32_t num_cdbs, cdb_request_t *
 }
 
 void cdb_generate_header(cdb_t *cdb, char* name, char* desc, uint64_t max_records, int32_t type,
-    char* units, uint64_t min_value, uint64_t max_value, int32_t interval) {
+    char* units, uint64_t min_value, uint64_t max_value) {
 
     if (max_records == 0) {
         max_records = CDB_DEFAULT_RECORDS;
-    }
-
-    if (interval == 0) {
-        interval = CDB_DEFAULT_INTERVAL;
     }
 
     if (type == 0) {
@@ -1271,7 +1267,6 @@ void cdb_generate_header(cdb_t *cdb, char* name, char* desc, uint64_t max_record
     strncpy(cdb->header->token, CDB_TOKEN, sizeof(cdb->header->token));
 
     cdb->header->type         = type;
-    cdb->header->interval     = interval;
     cdb->header->max_records  = max_records;
     cdb->header->min_value    = min_value;
     cdb->header->max_value    = max_value;

@@ -247,7 +247,6 @@ new(class, path, ...)
   int flags = -1;
   int mode  = -1;
   int type  = CDB_DEFAULT_DATA_TYPE;
-  int interval = 0;
 
   char *name  = "";
   char *desc  = "";
@@ -266,7 +265,7 @@ new(class, path, ...)
 
   cdb_t *cdb = cdb_new();
 
-  /* class, path  flags, mode, name, max_records, type, units, min_value, max_value, interval */
+  /* class, path  flags, mode, name, max_records, type, units, min_value, max_value */
   if (items >= 2 && SvOK(ST(2)))
     flags = SvIV(ST(2));
 
@@ -292,9 +291,6 @@ new(class, path, ...)
 
   if (items >= 9 && SvOK(ST(10)))
     max_value = SvNV(ST(9));
-
-  if (items >= 10 && SvOK(ST(10)))
-    interval = SvIV(ST(10));
 
   cdb->filename = path;
   cdb->flags    = flags;
@@ -322,7 +318,7 @@ new(class, path, ...)
 
   } else {
 
-    cdb_generate_header(cdb, name, desc, max_records, type, units, min_value, max_value, interval);
+    cdb_generate_header(cdb, name, desc, max_records, type, units, min_value, max_value);
 
     ret = cdb_write_header(cdb);
 
@@ -342,7 +338,6 @@ new(class, path, ...)
   my_hv_store(header, "max_records", newSVnv(cdb->header->max_records));
   my_hv_store(header, "min_value", newSVnv(cdb->header->min_value));
   my_hv_store(header, "max_value", newSVnv(cdb->header->max_value));
-  my_hv_store(header, "interval", newSVnv(cdb->header->interval));
 
   my_hv_store(self, "header", newRV_noinc((SV *)header));
   my_hv_store(self, "statistics", newSV(0));
@@ -614,10 +609,6 @@ _set_header(self, name, value)
 
   } else if (strEQ(name, "max_value")) {
     cdb->header->max_value = SvIV(value);
-    cdb->synced = false;
-
-  } else if (strEQ(name, "interval")) {
-    cdb->header->interval = SvIV(value);
     cdb->synced = false;
 
   } else if (strEQ(name, "units")) {

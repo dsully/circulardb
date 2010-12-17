@@ -54,14 +54,13 @@ sub test_rw {
     my $units       = "absolute";
     my $min_value   = 0;
     my $max_value   = 0;
-    my $interval    = 300;
 
     for (my $i = 1; $i < 11; $i++) {
       push @$records, [ $now, $i ];
       $now += 1
     }
 
-    my $cdb = CircularDB::Storage->new($file, $flags, $mode, $name, $max_records, $type, $units, $min_value, $max_value, $interval);
+    my $cdb = CircularDB::Storage->new($file, $flags, $mode, $name, $max_records, $type, $units, $min_value, $max_value);
     ok($cdb);
     ok($cdb->max_value == $max_value);
 

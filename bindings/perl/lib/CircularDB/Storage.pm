@@ -3,7 +3,7 @@ package CircularDB::Storage;
 use base qw(Class::Accessor);
 
 __PACKAGE__->mk_accessors(qw(
-  name filename max_records min_value max_value interval units type num_records
+  name filename max_records min_value max_value units type num_records
 ));
 
 sub get {

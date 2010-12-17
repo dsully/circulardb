@@ -131,7 +131,7 @@ static PyObject* Storage_new(PyTypeObject *type, PyObject *args, PyObject *kwdic
 static int Storage_init(PyObject *self, PyObject *args, PyObject *kwdict) {
 
   static char *kwlist[] = {
-    "filename", "flags", "mode", "name", "desc", "max_records", "type", "units", "min_value", "max_value", "interval", NULL,
+    "filename", "flags", "mode", "name", "desc", "max_records", "type", "units", "min_value", "max_value", NULL,
   };
 
   char *filename;
@@ -142,12 +142,11 @@ static int Storage_init(PyObject *self, PyObject *args, PyObject *kwdict) {
   char *type           = (char*)_string_from_cdb_type(CDB_DEFAULT_DATA_TYPE);
   char *units          = CDB_DEFAULT_DATA_UNIT;
   uint64_t max_records = 0;
-  int interval         = 0;
   double min_value     = 0;
   double max_value     = 0;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwdict, "s|iiszlzzlli:new", kwlist,
-    &filename, &flags, &mode, &name, &desc, &max_records, &type, &units, &min_value, &max_value, &interval)) {
+    &filename, &flags, &mode, &name, &desc, &max_records, &type, &units, &min_value, &max_value)) {
     return -1;
   }
 
@@ -174,7 +173,7 @@ static int Storage_init(PyObject *self, PyObject *args, PyObject *kwdict) {
 
   } else {
 
-    cdb_generate_header(cdb, name, desc, max_records, _cdb_type_from_string(type), units, min_value, max_value, interval);
+    cdb_generate_header(cdb, name, desc, max_records, _cdb_type_from_string(type), units, min_value, max_value);
 
     if (cdb_write_header(cdb) != CDB_SUCCESS) {
       PyErr_SetFromErrno(PyExc_IOError);
@@ -191,7 +190,6 @@ static int Storage_init(PyObject *self, PyObject *args, PyObject *kwdict) {
   PyDict_SetItemString(header, "max_records", PyInt_FromLong(cdb->header->max_records));
   PyDict_SetItemString(header, "min_value", PyInt_FromLong(cdb->header->min_value));
   PyDict_SetItemString(header, "max_value", PyInt_FromLong(cdb->header->max_value));
-  PyDict_SetItemString(header, "interval", PyInt_FromLong(cdb->header->interval));
 
   return 0;
 }
@@ -222,12 +220,6 @@ static int Storage_header_set(PyObject *self, PyObject *value, void *closure) {
 
     PyDict_SetItemString(header, key, value);
     cdb->header->max_value = PyInt_AsUnsignedLongLongMask(value);
-    cdb->synced = false;
-
-  } else if (strcmp(key, "interval") == 0) {
-
-    PyDict_SetItemString(header, key, value);
-    cdb->header->interval = PyInt_AsUnsignedLongLongMask(value);
     cdb->synced = false;
 
   } else if (strcmp(key, "units") == 0) {
@@ -682,7 +674,6 @@ static PyGetSetDef Storage_getseters[] = {
   { "max_records", (getter)Storage_header_get, (setter)Storage_header_set, "Max records before rollover", (void*)"max_records" },
   { "max_value",   (getter)Storage_header_get, (setter)Storage_header_set, "Max CDB value", (void*)"max_value" },
   { "min_value",   (getter)Storage_header_get, (setter)Storage_header_set, "Min CDB value", (void*)"min_value" },
-  { "interval",    (getter)Storage_header_get, (setter)Storage_header_set, "Interval between updates", (void*)"interval" },
   { "name",        (getter)Storage_header_get, (setter)Storage_header_set, "Name", (void*)"name" },
   { "desc",        (getter)Storage_header_get, (setter)Storage_header_set, "Description", (void*)"desc" },
   { "units",       (getter)Storage_header_get, (setter)Storage_header_set, "Record Units", (void*)"units" },

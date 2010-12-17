@@ -70,11 +70,6 @@ sub max_value {
   return $self->{'cdbs'}->[0]->max_value;
 }
 
-sub interval {
-  my $self = shift;
-  return $self->{'cdbs'}->[0]->interval;
-}
-
 sub num_records {
   my $self = shift;
   return $self->{'cdbs'}->[0]->num_records;

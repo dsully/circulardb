@@ -54,13 +54,12 @@ class TestCircularDB(unittest.TestCase):
     units       = "absolute"
     min_value   = 0
     max_value   = 0
-    interval    = 300
 
     for i in range(1, 11):
       records.append([ now, float(i) ])
       now += 1
 
-    cdb = circulardb.Storage(self.file, flags, mode, self.name, desc, max_records, type, units, min_value, max_value, interval)
+    cdb = circulardb.Storage(self.file, flags, mode, self.name, desc, max_records, type, units, min_value, max_value)
     self.assert_(cdb)
     self.assertEqual(cdb.max_value, max_value)
 

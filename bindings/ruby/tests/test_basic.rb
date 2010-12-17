@@ -50,14 +50,13 @@ class TestCircularDB < Test::Unit::TestCase
     units       = "absolute"
     min_value   = 0
     max_value   = 0
-    interval    = 300
 
     (1..10).each { |i|
       records.push([ now, i.to_f ])
       now += 1
     }
 
-    cdb = CircularDB::Storage.new(@file, flags, mode, @name, max_records, type, units, min_value, max_value, interval)
+    cdb = CircularDB::Storage.new(@file, flags, mode, @name, max_records, type, units, min_value, max_value)
     assert(cdb)
     assert_equal(cdb.max_value, max_value)
 

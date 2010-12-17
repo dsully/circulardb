@@ -41,7 +41,6 @@ extern "C" {
 #define CDB_EXTENSION "cdb"
 #define CDB_DEFAULT_DATA_UNIT "absolute"
 #define CDB_DEFAULT_RECORDS 105120  // 1 year - 5 minute intervals
-#define CDB_DEFAULT_INTERVAL 60 * 5 // 5 minutes
 
 #define CDB_NAN (double)(0.0/0.0)
 
@@ -60,7 +59,6 @@ typedef struct cdb_header_s {
     double      min_value;          // Values outside this range will be ignored/dropped
     double      max_value;          // Set both to 0 to disable.
     uint64_t    max_records;        // Maximum records this CDB can hold before cycling.
-    int32_t     interval;           // Interval that we expect to see data at.
     uint64_t    start_record;       // Pointer to the logical start record
     uint64_t    num_records;
 } cdb_header_t;
@@ -154,7 +152,7 @@ int cdb_read_header(cdb_t *cdb);
 int cdb_write_header(cdb_t *cdb);
 
 void cdb_generate_header(cdb_t *cdb, char* name, char* desc, uint64_t max_records, int32_t type,
-    char* units, uint64_t min_value, uint64_t max_value, int interval);
+    char* units, uint64_t min_value, uint64_t max_value);
 
 /* Return CDB_SUCCESS, CDB_ERDONLY, CDB_EINVMAX or errno */
 int cdb_write_records(cdb_t *cdb, cdb_record_t *records, uint64_t len, uint64_t *num_recs);
